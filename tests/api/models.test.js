@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
-const { successResponse, listResponse, errorResponse } = require('../../api/utils/response');
-const Order = require('../../api/models/Order');
-const Waybill = require('../../api/models/Waybill');
-const TrackingLog = require('../../api/models/TrackingLog');
+const { successResponse, listResponse, errorResponse } = require('../../server/utils/response');
+const Order = require('../../server/models/Order');
+const Waybill = require('../../server/models/Waybill');
+const TrackingLog = require('../../server/models/TrackingLog');
 
 describe('Response Utils', () => {
   test('successResponse returns data with message', () => {

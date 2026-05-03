@@ -1,9 +1,9 @@
 const request = require('supertest');
 const express = require('express');
 const mongoose = require('mongoose');
-const orderRoutes = require('../../api/routes/orders');
-const waybillRoutes = require('../../api/routes/waybills');
-const trackingRoutes = require('../../api/routes/tracking');
+const orderRoutes = require('../../server/routes/orders');
+const waybillRoutes = require('../../server/routes/waybills');
+const trackingRoutes = require('../../server/routes/tracking');
 
 describe('Orders API', () => {
   let app;

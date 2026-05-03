@@ -1,10 +1,10 @@
 const express = require('express');
 const cors = require('cors');
-const connectDB = require('./lib/db');
+const connectDB = require('../server/lib/db');
 
-const orderRoutes = require('./routes/orders');
-const waybillRoutes = require('./routes/waybills');
-const trackingRoutes = require('./routes/tracking');
+const orderRoutes = require('../server/routes/orders');
+const waybillRoutes = require('../server/routes/waybills');
+const trackingRoutes = require('../server/routes/tracking');
 
 const app = express();
 
