@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const serverless = require('serverless-http');
 const connectDB = require('./lib/db');
 
 const orderRoutes = require('./routes/orders');
@@ -20,15 +19,12 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-const handler = serverless(app);
+let dbConnected = false;
 
-// if (process.env.NODE_ENV !== 'production') {
-  const PORT = process.env.PORT || 3000;
-  connectDB(process.env.MONGODB_URI || 'mongodb://localhost:27017/coldchain').then(() => {
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
-  });
-// }
-
-module.exports = handler;
+module.exports = async (req, res) => {
+  if (!dbConnected && process.env.MONGODB_URI) {
+    await connectDB(process.env.MONGODB_URI);
+    dbConnected = true;
+  }
+  app(req, res);
+};
