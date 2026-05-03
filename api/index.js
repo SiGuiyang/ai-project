@@ -22,13 +22,13 @@ app.get('/api/health', (_req, res) => {
 
 const handler = serverless(app);
 
-if (process.env.NODE_ENV !== 'production') {
+// if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 3000;
   connectDB(process.env.MONGODB_URI || 'mongodb://localhost:27017/coldchain').then(() => {
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
   });
-}
+// }
 
 module.exports = handler;
