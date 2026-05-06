@@ -345,7 +345,7 @@ async function handleFileChange(event) {
       remarks: row['备注'],
     }))
 
-    const res = await orders.import({ data: importData })
+    const res = await orders.importData(importData)
     ElMessage.success(res.message || '导入完成')
     fetchOrders()
   } catch (err) {

@@ -24,7 +24,7 @@ export const orders = {
   updateStatus: (id, status) => client.patch(`/orders/${id}/status`, { status }),
   delete: (id) => client.delete(`/orders/${id}`),
   export: (params) => client.get('/orders/export', { params }),
-  import: (data) => client.post('/orders/import`, data),
+  importData: (data) => client.post('/orders/import', data),
 }
 
 export const waybills = {
@@ -32,6 +32,8 @@ export const waybills = {
   get: (id) => client.get(`/waybills/${id}`),
   create: (data) => client.post('/waybills', data),
   updateStatus: (id, status) => client.patch(`/waybills/${id}/status`, { status }),
+  export: (params) => client.get('/waybills/export', { params }),
+  importData: (data) => client.post('/waybills/import', data),
 }
 
 export const tracking = {

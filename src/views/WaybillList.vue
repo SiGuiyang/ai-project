@@ -271,7 +271,7 @@ async function handleFileChange(event) {
       estimatedArrival: row['预计到达时间'] ? new Date(row['预计到达时间']) : null,
     }))
 
-    const res = await waybills.import({ data: importData })
+    const res = await waybills.importData(importData)
     ElMessage.success(res.message || '导入完成')
     fetchWaybills()
   } catch (err) {
