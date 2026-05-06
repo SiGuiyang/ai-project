@@ -3,6 +3,55 @@ const router = express.Router();
 const Waybill = require('../models/Waybill');
 const { successResponse, listResponse, errorResponse } = require('../utils/response');
 
+router.get('/export', async (req, res) => {
+  try {
+    const { status, orderId } = req.query;
+    const filter = {};
+    if (status) filter.status = status;
+    if (orderId) filter.orderId = orderId;
+
+    const waybills = await Waybill.find(filter).sort({ createdAt: -1 }).populate('orderId');
+    res.json(successResponse(waybills, '导出数据获取成功'));
+  } catch (err) {
+    const { status, body } = errorResponse('internal_error', err.message);
+    res.status(status).json(body);
+  }
+});
+
+router.post('/import', async (req, res) => {
+  try {
+    const { data } = req.body;
+    if (!Array.isArray(data) || data.length === 0) {
+      const { status, body } = errorResponse('validation_error', '导入数据不能为空');
+      return res.status(status).json(body);
+    }
+
+    const results = [];
+    for (const item of data) {
+      try {
+        const waybill = await Waybill.create({
+          orderId: item.orderId,
+          orderNo: item.orderNo,
+          carrierName: item.carrierName,
+          vehicleNo: item.vehicleNo,
+          vehiclePlate: item.vehiclePlate,
+          driverName: item.driverName,
+          driverPhone: item.driverPhone,
+          estimatedArrival: item.estimatedArrival ? new Date(item.estimatedArrival) : null,
+        });
+        results.push({ success: true, waybillNo: waybill.waybillNo });
+      } catch (err) {
+        results.push({ success: false, error: err.message, data: item });
+      }
+    }
+
+    res.status(200).json(successResponse(results, `导入完成：成功 ${results.filter(r => r.success).length} 条，失败 ${results.filter(r => !r.success).length} 条`));
+  } catch (err) {
+    const { status, body } = errorResponse('internal_error', err.message);
+    res.status(status).json(body);
+  }
+});
+
 router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;

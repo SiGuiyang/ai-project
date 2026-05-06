@@ -3,6 +3,62 @@ const router = express.Router();
 const Order = require('../models/Order');
 const { successResponse, listResponse, errorResponse } = require('../utils/response');
 
+router.get('/export', async (req, res) => {
+  try {
+    const { status, tempRange } = req.query;
+    const filter = {};
+    if (status) filter.status = status;
+    if (tempRange) filter.tempRange = tempRange;
+
+    const orders = await Order.find(filter).sort({ createdAt: -1 });
+    res.json(successResponse(orders, '导出数据获取成功'));
+  } catch (err) {
+    const { status, body } = errorResponse('internal_error', err.message);
+    res.status(status).json(body);
+  }
+});
+
+router.post('/import', async (req, res) => {
+  try {
+    const { data } = req.body;
+    if (!Array.isArray(data) || data.length === 0) {
+      const { status, body } = errorResponse('validation_error', '导入数据不能为空');
+      return res.status(status).json(body);
+    }
+
+    const results = [];
+    for (const item of data) {
+      try {
+        const order = await Order.create({
+          customerName: item.customerName,
+          customerPhone: item.customerPhone,
+          pickupAddress: item.pickupAddress,
+          pickupContact: item.pickupContact,
+          pickupPhone: item.pickupPhone,
+          deliveryAddress: item.deliveryAddress,
+          deliveryContact: item.deliveryContact,
+          deliveryPhone: item.deliveryPhone,
+          cargoType: item.cargoType,
+          cargoWeight: item.cargoWeight,
+          cargoVolume: item.cargoVolume,
+          tempMin: item.tempMin,
+          tempMax: item.tempMax,
+          tempRange: item.tempRange,
+          remarks: item.remarks,
+        });
+        results.push({ success: true, orderNo: order.orderNo });
+      } catch (err) {
+        results.push({ success: false, error: err.message, data: item });
+      }
+    }
+
+    res.status(200).json(successResponse(results, `导入完成：成功 ${results.filter(r => r.success).length} 条，失败 ${results.filter(r => !r.success).length} 条`));
+  } catch (err) {
+    const { status, body } = errorResponse('internal_error', err.message);
+    res.status(status).json(body);
+  }
+});
+
 router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;

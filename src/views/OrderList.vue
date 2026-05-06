@@ -2,7 +2,15 @@
   <div class="order-list">
     <div class="page-header">
       <h2 class="page-title">订单管理</h2>
-      <el-button type="primary" @click="showCreateDialog">创建订单</el-button>
+      <div class="header-actions">
+        <el-button type="success" @click="handleExport">
+          <el-icon><Download /></el-icon>导出
+        </el-button>
+        <el-button type="warning" @click="handleImport">
+          <el-icon><Upload /></el-icon>导入
+        </el-button>
+        <el-button type="primary" @click="showCreateDialog">创建订单</el-button>
+      </div>
     </div>
 
     <el-card class="filter-card">
@@ -97,6 +105,14 @@
       :order="currentOrder"
       @submit="handleCreate"
     />
+
+    <input
+      ref="importFileRef"
+      type="file"
+      accept=".xlsx,.xls"
+      style="display: none"
+      @change="handleFileChange"
+    />
   </div>
 </template>
 
@@ -105,11 +121,15 @@ import { ref, reactive, onMounted } from 'vue'
 import { orders } from '@/api/client'
 import OrderForm from '@/components/OrderForm.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Download, Upload } from '@element-plus/icons-vue'
+import * as XLSX from 'xlsx'
+import { saveAs } from 'file-saver'
 
 const loading = ref(false)
 const ordersList = ref([])
 const dialogVisible = ref(false)
 const currentOrder = ref(null)
+const importFileRef = ref(null)
 
 const filters = reactive({
   status: '',
@@ -134,6 +154,12 @@ const tempRangeMap = {
   frozen: { label: '冷冻', type: 'primary' },
   cold: { label: '冷藏', type: 'success' },
   constant: { label: '恒温', type: 'warning' },
+}
+
+const tempRangeLabel = {
+  frozen: '冷冻',
+  cold: '冷藏',
+  constant: '恒温',
 }
 
 function getStatusType(status) {
@@ -232,6 +258,112 @@ function viewDetail(order) {
   dialogVisible.value = true
 }
 
+// 导出功能
+async function handleExport() {
+  try {
+    const params = {}
+    if (filters.status) params.status = filters.status
+    if (filters.tempRange) params.tempRange = filters.tempRange
+
+    const res = await orders.export(params)
+    const data = res.data || []
+
+    if (data.length === 0) {
+      ElMessage.warning('没有可导出的数据')
+      return
+    }
+
+    const exportData = data.map((item) => ({
+      '订单号': item.orderNo,
+      '客户名称': item.customerName,
+      '客户电话': item.customerPhone,
+      '取货地址': item.pickupAddress,
+      '取货联系人': item.pickupContact,
+      '取货电话': item.pickupPhone,
+      '送货地址': item.deliveryAddress,
+      '收货联系人': item.deliveryContact,
+      '收货电话': item.deliveryPhone,
+      '货物类型': item.cargoType,
+      '货物重量(kg)': item.cargoWeight,
+      '货物体积(m³)': item.cargoVolume,
+      '最低温度(°C)': item.tempMin,
+      '最高温度(°C)': item.tempMax,
+      '温度范围': tempRangeLabel[item.tempRange] || item.tempRange,
+      '状态': getStatusLabel(item.status),
+      '备注': item.remarks,
+      '创建时间': formatDate(item.createdAt),
+    }))
+
+    const ws = XLSX.utils.json_to_sheet(exportData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '订单列表')
+    const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+    const blob = new Blob([buf], { type: 'application/octet-stream' })
+    saveAs(blob, `订单列表_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    ElMessage.success('导出成功')
+  } catch (err) {
+    ElMessage.error('导出失败')
+  }
+}
+
+// 导入功能
+function handleImport() {
+  importFileRef.value?.click()
+}
+
+async function handleFileChange(event) {
+  const file = event.target.files[0]
+  if (!file) return
+
+  try {
+    const data = await readFileAsArrayBuffer(file)
+    const workbook = XLSX.read(data, { type: 'array' })
+    const sheetName = workbook.SheetNames[0]
+    const sheet = workbook.Sheets[sheetName]
+    const jsonData = XLSX.utils.sheet_to_json(sheet)
+
+    if (jsonData.length === 0) {
+      ElMessage.warning('文件中没有数据')
+      return
+    }
+
+    const importData = jsonData.map((row) => ({
+      customerName: row['客户名称'],
+      customerPhone: row['客户电话'],
+      pickupAddress: row['取货地址'],
+      pickupContact: row['取货联系人'],
+      pickupPhone: row['取货电话'],
+      deliveryAddress: row['送货地址'],
+      deliveryContact: row['收货联系人'],
+      deliveryPhone: row['收货电话'],
+      cargoType: row['货物类型'],
+      cargoWeight: row['货物重量(kg)'],
+      cargoVolume: row['货物体积(m³)'],
+      tempMin: row['最低温度(°C)'],
+      tempMax: row['最高温度(°C)'],
+      tempRange: row['温度范围'] === '冷冻' ? 'frozen' : row['温度范围'] === '冷藏' ? 'cold' : 'constant',
+      remarks: row['备注'],
+    }))
+
+    const res = await orders.import({ data: importData })
+    ElMessage.success(res.message || '导入完成')
+    fetchOrders()
+  } catch (err) {
+    ElMessage.error('导入失败')
+  } finally {
+    event.target.value = ''
+  }
+}
+
+function readFileAsArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => resolve(e.target.result)
+    reader.onerror = reject
+    reader.readAsArrayBuffer(file)
+  })
+}
+
 onMounted(fetchOrders)
 </script>
 
@@ -245,6 +377,11 @@ onMounted(fetchOrders)
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .page-title {

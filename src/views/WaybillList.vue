@@ -2,7 +2,15 @@
   <div class="waybill-list">
     <div class="page-header">
       <h2 class="page-title">转运单管理</h2>
-      <el-button type="primary" @click="showCreateDialog">创建转运单</el-button>
+      <div class="header-actions">
+        <el-button type="success" @click="handleExport">
+          <el-icon><Download /></el-icon>导出
+        </el-button>
+        <el-button type="warning" @click="handleImport">
+          <el-icon><Upload /></el-icon>导入
+        </el-button>
+        <el-button type="primary" @click="showCreateDialog">创建转运单</el-button>
+      </div>
     </div>
 
     <el-card class="filter-card">
@@ -75,6 +83,14 @@
       :waybill="currentWaybill"
       @submit="handleCreate"
     />
+
+    <input
+      ref="importFileRef"
+      type="file"
+      accept=".xlsx,.xls"
+      style="display: none"
+      @change="handleFileChange"
+    />
   </div>
 </template>
 
@@ -84,12 +100,16 @@ import { useRouter } from 'vue-router'
 import { waybills } from '@/api/client'
 import WaybillForm from '@/components/WaybillForm.vue'
 import { ElMessage } from 'element-plus'
+import { Download, Upload } from '@element-plus/icons-vue'
+import * as XLSX from 'xlsx'
+import { saveAs } from 'file-saver'
 
 const router = useRouter()
 const loading = ref(false)
 const waybillsList = ref([])
 const dialogVisible = ref(false)
 const currentWaybill = ref(null)
+const importFileRef = ref(null)
 
 const filters = reactive({
   status: '',
@@ -105,6 +125,12 @@ const statusMap = {
   pending: { label: '待发车', type: 'warning' },
   transporting: { label: '运输中', type: 'primary' },
   signed: { label: '已签收', type: 'success' },
+}
+
+const statusLabel = {
+  pending: '待发车',
+  transporting: '运输中',
+  signed: '已签收',
 }
 
 function getStatusType(status) {
@@ -173,6 +199,97 @@ function viewTracking(waybill) {
   router.push({ path: '/tracking', query: { waybillNo: waybill.waybillNo, waybillId: waybill._id } })
 }
 
+// 导出功能
+async function handleExport() {
+  try {
+    const params = {}
+    if (filters.status) params.status = filters.status
+
+    const res = await waybills.export(params)
+    const data = res.data || []
+
+    if (data.length === 0) {
+      ElMessage.warning('没有可导出的数据')
+      return
+    }
+
+    const exportData = data.map((item) => ({
+      '转运单号': item.waybillNo,
+      '关联订单号': item.orderNo,
+      '承运商': item.carrierName,
+      '车牌号': item.vehicleNo,
+      '车辆类型': item.vehiclePlate,
+      '司机姓名': item.driverName,
+      '司机电话': item.driverPhone,
+      '当前位置': item.currentLocation,
+      '状态': statusLabel[item.status] || item.status,
+      '预计到达时间': item.estimatedArrival ? new Date(item.estimatedArrival).toLocaleString('zh-CN') : '',
+    }))
+
+    const ws = XLSX.utils.json_to_sheet(exportData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '转运单列表')
+    const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+    const blob = new Blob([buf], { type: 'application/octet-stream' })
+    saveAs(blob, `转运单列表_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    ElMessage.success('导出成功')
+  } catch (err) {
+    ElMessage.error('导出失败')
+  }
+}
+
+// 导入功能
+function handleImport() {
+  importFileRef.value?.click()
+}
+
+async function handleFileChange(event) {
+  const file = event.target.files[0]
+  if (!file) return
+
+  try {
+    const data = await readFileAsArrayBuffer(file)
+    const workbook = XLSX.read(data, { type: 'array' })
+    const sheetName = workbook.SheetNames[0]
+    const sheet = workbook.Sheets[sheetName]
+    const jsonData = XLSX.utils.sheet_to_json(sheet)
+
+    if (jsonData.length === 0) {
+      ElMessage.warning('文件中没有数据')
+      return
+    }
+
+    const importData = jsonData.map((row) => ({
+      orderId: row['关联订单号'] || '',
+      orderNo: row['关联订单号'] || '',
+      carrierName: row['承运商'],
+      vehicleNo: row['车牌号'],
+      vehiclePlate: row['车辆类型'],
+      driverName: row['司机姓名'],
+      driverPhone: row['司机电话'],
+      currentLocation: row['当前位置'],
+      estimatedArrival: row['预计到达时间'] ? new Date(row['预计到达时间']) : null,
+    }))
+
+    const res = await waybills.import({ data: importData })
+    ElMessage.success(res.message || '导入完成')
+    fetchWaybills()
+  } catch (err) {
+    ElMessage.error('导入失败')
+  } finally {
+    event.target.value = ''
+  }
+}
+
+function readFileAsArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => resolve(e.target.result)
+    reader.onerror = reject
+    reader.readAsArrayBuffer(file)
+  })
+}
+
 onMounted(fetchWaybills)
 </script>
 
@@ -186,6 +303,11 @@ onMounted(fetchWaybills)
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .page-title {

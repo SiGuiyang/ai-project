@@ -23,6 +23,8 @@ export const orders = {
   create: (data) => client.post('/orders', data),
   updateStatus: (id, status) => client.patch(`/orders/${id}/status`, { status }),
   delete: (id) => client.delete(`/orders/${id}`),
+  export: (params) => client.get('/orders/export', { params }),
+  import: (data) => client.post('/orders/import`, data),
 }
 
 export const waybills = {
