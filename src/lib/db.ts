@@ -97,6 +97,8 @@ export interface WaybillQuery {
   externalCode?: string;
   receiverName?: string;
   batchId?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface PaginatedResult<T> {
@@ -110,7 +112,7 @@ export interface PaginatedResult<T> {
 export async function queryWaybills(
   query: WaybillQuery
 ): Promise<PaginatedResult<import("@prisma/client").Waybill>> {
-  const { page, pageSize, externalCode, receiverName, batchId } = query;
+  const { page, pageSize, externalCode, receiverName, batchId, startDate, endDate } = query;
   const where: Record<string, unknown> = {};
 
   if (externalCode) {
@@ -121,6 +123,12 @@ export async function queryWaybills(
   }
   if (batchId) {
     where.batchId = batchId;
+  }
+  if (startDate || endDate) {
+    const createdAt: Record<string, Date> = {};
+    if (startDate) createdAt.gte = new Date(startDate);
+    if (endDate) createdAt.lte = new Date(endDate + "T23:59:59.999Z");
+    where.createdAt = createdAt;
   }
 
   const [data, total] = await Promise.all([

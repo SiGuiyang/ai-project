@@ -30,6 +30,8 @@ export default function HistoryPage() {
   const [page, setPage] = useState(1);
   const [externalCode, setExternalCode] = useState("");
   const [receiverName, setReceiverName] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const pageSize = 20;
 
   const fetchData = useCallback(async () => {
@@ -38,6 +40,8 @@ export default function HistoryPage() {
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (externalCode) params.set("externalCode", externalCode);
       if (receiverName) params.set("receiverName", receiverName);
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
       const res = await fetch(`/api/waybills?${params}`);
       const json = await res.json();
       setData(json);
@@ -46,7 +50,7 @@ export default function HistoryPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, externalCode, receiverName, pageSize]);
+  }, [page, externalCode, receiverName, startDate, endDate, pageSize]);
 
   useEffect(() => {
     fetchData(); // eslint-disable-line
@@ -61,8 +65,8 @@ export default function HistoryPage() {
         </span>
       </div>
       <div className="el-card__body">
-        <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-          <div className="el-input" style={{ flex: 1, maxWidth: 260 }}>
+        <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+          <div className="el-input" style={{ flex: 1, minWidth: 180, maxWidth: 240 }}>
             <input
               className="el-input__inner"
               placeholder="搜索客户单号"
@@ -70,12 +74,31 @@ export default function HistoryPage() {
               onChange={(e) => { setExternalCode(e.target.value); setPage(1); }}
             />
           </div>
-          <div className="el-input" style={{ flex: 1, maxWidth: 260 }}>
+          <div className="el-input" style={{ flex: 1, minWidth: 180, maxWidth: 240 }}>
             <input
               className="el-input__inner"
               placeholder="搜索收件人姓名"
               value={receiverName}
               onChange={(e) => { setReceiverName(e.target.value); setPage(1); }}
+            />
+          </div>
+          <div className="el-input" style={{ width: 180 }}>
+            <input
+              className="el-input__inner"
+              type="date"
+              value={startDate}
+              onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+              style={{ color: startDate ? undefined : "var(--el-text-color-placeholder)" }}
+            />
+          </div>
+          <span style={{ display: "flex", alignItems: "center", color: "var(--el-text-color-secondary)", fontSize: 13 }}>至</span>
+          <div className="el-input" style={{ width: 180 }}>
+            <input
+              className="el-input__inner"
+              type="date"
+              value={endDate}
+              onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+              style={{ color: endDate ? undefined : "var(--el-text-color-placeholder)" }}
             />
           </div>
         </div>

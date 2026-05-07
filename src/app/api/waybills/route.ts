@@ -9,6 +9,8 @@ export async function GET(request: NextRequest) {
     const externalCode = searchParams.get("externalCode") || undefined;
     const receiverName = searchParams.get("receiverName") || undefined;
     const batchId = searchParams.get("batchId") || undefined;
+    const startDate = searchParams.get("startDate") || undefined;
+    const endDate = searchParams.get("endDate") || undefined;
 
     const result = await queryWaybills({
       page,
@@ -16,6 +18,8 @@ export async function GET(request: NextRequest) {
       externalCode,
       receiverName,
       batchId,
+      startDate,
+      endDate,
     });
 
     return NextResponse.json(result);
