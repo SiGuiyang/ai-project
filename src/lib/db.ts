@@ -38,7 +38,8 @@ export async function createBatch(): Promise<string> {
 }
 
 export async function saveWaybills(
-  inputs: WaybillInput[]
+  inputs: WaybillInput[],
+  mode: "new" | "append" = "new"
 ): Promise<BatchResult> {
   if (inputs.length === 0) {
     return { batchId: "", successCount: 0, failCount: 0, failedRows: [] };
@@ -46,13 +47,12 @@ export async function saveWaybills(
 
   const batchId = inputs[0].batchId;
 
-  await prisma.importBatch.update({
-    where: { id: batchId },
-    data: {
-      status: "processing",
-      totalCount: inputs.length,
-    },
-  });
+  if (mode === "new") {
+    await prisma.importBatch.update({
+      where: { id: batchId },
+      data: { status: "processing", totalCount: inputs.length },
+    });
+  }
 
   let successCount = 0;
   let failCount = 0;
@@ -61,42 +61,34 @@ export async function saveWaybills(
   for (let i = 0; i < inputs.length; i++) {
     try {
       const input = inputs[i];
-      await prisma.waybill.create({
-        data: {
-          batchId: input.batchId,
-          externalCode: input.externalCode || null,
-          senderName: input.senderName,
-          senderPhone: input.senderPhone,
-          senderAddress: input.senderAddress,
-          receiverName: input.receiverName,
-          receiverPhone: input.receiverPhone,
-          receiverAddress: input.receiverAddress,
-          weight: input.weight,
-          pieces: input.pieces,
-          temperatureLevel: input.temperatureLevel,
-          remark: input.remark || null,
-        },
-      });
+      await prisma.waybill.create({ data: { ...input, externalCode: input.externalCode || null, remark: input.remark || null } });
       successCount++;
     } catch (e) {
       failCount++;
-      failedRows.push({
-        rowIndex: i,
-        error: e instanceof Error ? e.message : "保存失败",
-      });
+      failedRows.push({ rowIndex: i, error: e instanceof Error ? e.message : "保存失败" });
     }
   }
 
-  await prisma.importBatch.update({
-    where: { id: batchId },
-    data: {
-      status: "completed",
-      successCount,
-      failCount,
-    },
-  });
+  if (mode === "new") {
+    await prisma.importBatch.update({
+      where: { id: batchId },
+      data: { status: "completed", successCount, failCount },
+    });
+  } else {
+    await prisma.importBatch.update({
+      where: { id: batchId },
+      data: { totalCount: { increment: inputs.length }, successCount: { increment: successCount }, failCount: { increment: failCount } },
+    });
+  }
 
   return { batchId, successCount, failCount, failedRows };
+}
+
+export async function updateBatchStatus(batchId: string, status: string): Promise<void> {
+  await prisma.importBatch.update({
+    where: { id: batchId },
+    data: { status },
+  });
 }
 
 export interface WaybillQuery {
