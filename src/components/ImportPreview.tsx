@@ -203,47 +203,47 @@ export default function ImportPreview() {
             {submitProgress < 100 ? (
               <>
                 <div style={{ marginBottom: 20 }}>
-                  <svg width="40" height="40" viewBox="0 0 40 40" style={{ display: "inline-block" }}>
-                    <circle cx="20" cy="20" r="16" fill="none" stroke="var(--el-border-color-lighter)" strokeWidth="4"/>
+                  <svg width="44" height="44" viewBox="0 0 44 44" style={{ display: "inline-block" }}>
+                    <circle cx="22" cy="22" r="18" fill="none" stroke="var(--el-border-color-lighter)" strokeWidth="4"/>
                     <circle
-                      cx="20" cy="20" r="16" fill="none" stroke="var(--el-color-primary)" strokeWidth="4"
-                      strokeDasharray={`${(submitProgress / 100) * 100.5} 100.5`}
+                      cx="22" cy="22" r="18" fill="none" stroke="var(--el-color-primary)" strokeWidth="4"
+                      strokeDasharray={`${(submitProgress / 100) * 113.1} 113.1`}
                       strokeLinecap="round"
-                      transform="rotate(-90 20 20)"
-                      style={{ transition: "stroke-dasharray 0.3s ease" }}
+                      transform="rotate(-90 22 22)"
+                      style={{ transition: "stroke-dasharray 0.4s ease" }}
                     />
-                    <text x="20" y="24" textAnchor="middle" fontSize="12" fontWeight="600" fill="var(--el-text-color-primary)">
+                    <text x="22" y="27" textAnchor="middle" fontSize="13" fontWeight="700" fill="var(--el-text-color-primary)">
                       {submitProgress}%
                     </text>
                   </svg>
                 </div>
-                <p style={{ fontSize: 16, fontWeight: 600, color: "var(--el-text-color-primary)", marginBottom: 4 }}>
+                <p style={{ fontSize: 15, fontWeight: 600, color: "var(--el-text-color-primary)", marginBottom: 2 }}>
                   {submitLabel}
                 </p>
-                <p style={{ fontSize: 13, color: "var(--el-text-color-secondary)", marginBottom: 16 }}>
-                  第 {currentChunk}/{totalChunks} 批
+                <p style={{ fontSize: 12, color: "var(--el-text-color-secondary)", marginBottom: 16 }}>
+                  第 {currentChunk}/{totalChunks} 批 · 共 {rows.length} 条
                 </p>
                 <div className="el-progress-bar" style={{ height: 6, marginBottom: 16 }}>
-                  <div className="el-progress-bar__inner" style={{ width: `${submitProgress}%`, transition: "width 0.3s ease" }} />
+                  <div className="el-progress-bar__inner" style={{ width: `${submitProgress}%`, transition: "width 0.4s ease" }} />
                 </div>
-                <div style={{ display: "flex", justifyContent: "center", gap: 24, fontSize: 13 }}>
+                <div style={{ display: "flex", justifyContent: "center", gap: 20, fontSize: 13 }}>
                   <span style={{ color: "var(--el-color-success)" }}>成功 {successCount}</span>
                   {failCount > 0 && <span style={{ color: "var(--el-color-danger)" }}>失败 {failCount}</span>}
                 </div>
-                <p style={{ fontSize: 12, color: "var(--el-text-color-placeholder)", marginTop: 12 }}>正在提交数据，请勿关闭页面</p>
+                <p style={{ fontSize: 11, color: "var(--el-text-color-placeholder)", marginTop: 12, letterSpacing: 0.3 }}>正在提交数据，请勿关闭页面</p>
               </>
             ) : (
               <>
-                <div style={{ marginBottom: 16, animation: "scaleIn 0.3s ease" }}>
-                  <svg width="52" height="52" viewBox="0 0 52 52">
-                    <circle cx="26" cy="26" r="24" fill="var(--el-color-success-light-9)" stroke="var(--el-color-success)" strokeWidth="2.5"/>
-                    <path d="M18 26l6 6 12-12" fill="none" stroke="var(--el-color-success)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "drawCheck 0.4s ease 0.1s both" }}/>
+                <div style={{ marginBottom: 16, animation: "scaleIn 0.35s ease" }}>
+                  <svg width="56" height="56" viewBox="0 0 56 56">
+                    <circle cx="28" cy="28" r="26" fill="var(--el-color-success-light-9)" stroke="var(--el-color-success)" strokeWidth="2.5"/>
+                    <path d="M20 28l6 6 12-12" fill="none" stroke="var(--el-color-success)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "drawCheck 0.4s ease 0.1s both" }}/>
                   </svg>
                 </div>
                 <p style={{ fontSize: 18, fontWeight: 700, color: "var(--el-text-color-primary)", marginBottom: 12 }}>
                   提交完成
                 </p>
-                <div style={{ display: "flex", justifyContent: "center", gap: 32, fontSize: 15 }}>
+                <div style={{ display: "flex", justifyContent: "center", gap: 28, fontSize: 14 }}>
                   <span style={{ color: "var(--el-color-success)", fontWeight: 700 }}>成功 {successCount}</span>
                   {failCount > 0 && <span style={{ color: "var(--el-color-danger)", fontWeight: 700 }}>失败 {failCount}</span>}
                 </div>

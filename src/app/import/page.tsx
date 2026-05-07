@@ -19,7 +19,7 @@ const STEP_ORDER = ["upload", "mapping", "preview", "submitting", "result"];
 function StepIndicator({ current }: { current: string }) {
   const currentIdx = STEP_ORDER.indexOf(current);
   return (
-    <div className="el-steps" style={{ maxWidth: 600, margin: "0 auto 32px" }}>
+    <div className="el-steps" style={{ maxWidth: 560, margin: "0 auto 28px" }}>
       {STEPS.filter((s) => s.key !== "submitting").map((step) => {
         const stepIdx = STEP_ORDER.indexOf(step.key);
         const isActive = step.key === current;
@@ -27,7 +27,7 @@ function StepIndicator({ current }: { current: string }) {
         const circleClass = isActive ? "is-active" : isFinish ? "is-finish" : "is-wait";
         const titleClass = isActive ? "is-active" : isFinish ? "is-finish" : "is-wait";
         return (
-          <div key={step.key} className={`el-step ${isActive ? "is-active" : ""}`}>
+          <div key={step.key} className={`el-step ${isActive ? "is-active" : isFinish ? "is-finish" : ""}`}>
             <div className="el-step__head">
               <div className={`el-step__circle ${circleClass}`}>
                 {isFinish ? "✓" : step.icon}
@@ -41,34 +41,52 @@ function StepIndicator({ current }: { current: string }) {
   );
 }
 
+const STEP_TITLES: Record<string, string> = {
+  upload: "上传 Excel 文件",
+  mapping: "列映射配置",
+};
+
 function ImportFlow() {
   const { step } = useImport();
 
+  const pageContent = () => {
+    switch (step) {
+      case "upload":
+        return (
+          <div className="el-card">
+            <div className="el-card__header">
+              <span style={{ fontWeight: 500, fontSize: 15 }}>上传 Excel 文件</span>
+            </div>
+            <div className="el-card__body" style={{ display: "flex", justifyContent: "center" }}>
+              <FileUploader />
+            </div>
+          </div>
+        );
+      case "mapping":
+        return (
+          <div className="el-card">
+            <div className="el-card__header">
+              <span style={{ fontWeight: 500, fontSize: 15 }}>列映射配置</span>
+            </div>
+            <div className="el-card__body">
+              <TemplateMatcher />
+            </div>
+          </div>
+        );
+      case "preview":
+      case "submitting":
+        return <ImportPreview />;
+      case "result":
+        return <ImportResult />;
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div>
+    <div style={{ animation: "fadeInUp 0.3s ease" }}>
       <StepIndicator current={step} />
-      {step === "upload" && (
-        <div className="el-card">
-          <div className="el-card__header">
-            <span style={{ fontWeight: 500, fontSize: 16 }}>上传 Excel 文件</span>
-          </div>
-          <div className="el-card__body" style={{ display: "flex", justifyContent: "center" }}>
-            <FileUploader />
-          </div>
-        </div>
-      )}
-      {step === "mapping" && (
-        <div className="el-card">
-          <div className="el-card__header">
-            <span style={{ fontWeight: 500, fontSize: 16 }}>列映射配置</span>
-          </div>
-          <div className="el-card__body">
-            <TemplateMatcher />
-          </div>
-        </div>
-      )}
-      {(step === "preview" || step === "submitting") && <ImportPreview />}
-      {step === "result" && <ImportResult />}
+      {pageContent()}
     </div>
   );
 }

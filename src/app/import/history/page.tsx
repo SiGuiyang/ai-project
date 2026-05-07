@@ -65,8 +65,19 @@ export default function HistoryPage() {
         </span>
       </div>
       <div className="el-card__body">
-        <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-          <div className="el-input" style={{ flex: 1, minWidth: 180, maxWidth: 240 }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            marginBottom: 16,
+            flexWrap: "wrap",
+            padding: "12px 16px",
+            background: "var(--el-bg-color)",
+            borderRadius: 8,
+            border: "1px solid var(--el-border-color-lighter)",
+          }}
+        >
+          <div className="el-input" style={{ flex: 1, minWidth: 160, maxWidth: 220 }}>
             <input
               className="el-input__inner"
               placeholder="搜索客户单号"
@@ -74,7 +85,7 @@ export default function HistoryPage() {
               onChange={(e) => { setExternalCode(e.target.value); setPage(1); }}
             />
           </div>
-          <div className="el-input" style={{ flex: 1, minWidth: 180, maxWidth: 240 }}>
+          <div className="el-input" style={{ flex: 1, minWidth: 160, maxWidth: 220 }}>
             <input
               className="el-input__inner"
               placeholder="搜索收件人姓名"
@@ -83,7 +94,7 @@ export default function HistoryPage() {
             />
           </div>
           <div className="el-date-picker">
-            <div className="el-input" style={{ width: 160 }}>
+            <div className="el-input" style={{ width: 155 }}>
               <span className="el-input__prefix">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                   <rect x="1" y="2" width="12" height="11" rx="2" stroke="currentColor" strokeWidth="1.2"/>
@@ -102,7 +113,7 @@ export default function HistoryPage() {
               />
             </div>
             <span className="el-date-picker__separator">至</span>
-            <div className="el-input" style={{ width: 160 }}>
+            <div className="el-input" style={{ width: 155 }}>
               <span className="el-input__prefix">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                   <rect x="1" y="2" width="12" height="11" rx="2" stroke="currentColor" strokeWidth="1.2"/>

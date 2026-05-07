@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/Toast";
+import NavBar from "./NavBar";
 
 export const metadata: Metadata = {
   title: "批量导入系统",
@@ -19,7 +20,8 @@ export default function RootLayout({
           <header
             style={{
               height: 48,
-              background: "#fff",
+              background: "rgba(255,255,255,0.92)",
+              backdropFilter: "blur(8px)",
               borderBottom: "1px solid var(--el-border-color-light)",
               display: "flex",
               alignItems: "center",
@@ -27,7 +29,6 @@ export default function RootLayout({
               position: "sticky",
               top: 0,
               zIndex: 100,
-              boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
             }}
           >
             <a
@@ -38,43 +39,12 @@ export default function RootLayout({
                 color: "var(--el-text-color-primary)",
                 textDecoration: "none",
                 marginRight: 32,
+                letterSpacing: 0.5,
               }}
             >
               运单批量导入
             </a>
-            <nav style={{ display: "flex", gap: 4 }}>
-              <a
-                href="/import"
-                style={{
-                  height: 32,
-                  padding: "0 12px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  fontSize: 14,
-                  color: "var(--el-color-primary)",
-                  textDecoration: "none",
-                  borderRadius: "var(--el-border-radius-base)",
-                  background: "var(--el-color-primary-light-9)",
-                }}
-              >
-                导入
-              </a>
-              <a
-                href="/import/history"
-                style={{
-                  height: 32,
-                  padding: "0 12px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  fontSize: 14,
-                  color: "var(--el-text-color-regular)",
-                  textDecoration: "none",
-                  borderRadius: "var(--el-border-radius-base)",
-                }}
-              >
-                运单列表
-              </a>
-            </nav>
+            <NavBar />
           </header>
           <main style={{ maxWidth: 1200, margin: "0 auto", padding: "24px" }}>
             {children}

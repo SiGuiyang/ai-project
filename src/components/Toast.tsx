@@ -73,8 +73,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div
         style={{
           position: "fixed",
-          top: 16,
-          right: 16,
+          top: 60,
+          right: 20,
           zIndex: 9999,
           display: "flex",
           flexDirection: "column",
@@ -89,30 +89,30 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
-              padding: "10px 16px",
+              gap: 10,
+              padding: "12px 18px",
               background: BG_COLORS[t.type],
               border: `1px solid ${BORDER_COLORS[t.type]}`,
-              borderRadius: "var(--el-border-radius-base)",
-              boxShadow: "var(--el-shadow-light)",
+              borderRadius: 8,
+              boxShadow: "0 6px 20px rgba(0,0,0,0.1)",
               fontSize: 14,
               color: TEXT_COLORS[t.type],
               pointerEvents: "auto",
               cursor: "pointer",
-              minWidth: 280,
-              maxWidth: 420,
-              animation: "toast-slide-in 0.25s ease-out",
+              minWidth: 300,
+              maxWidth: 440,
+              animation: "toast-slide-in 0.3s ease-out",
             }}
           >
             <span
               style={{
-                width: 20,
-                height: 20,
+                width: 22,
+                height: 22,
                 borderRadius: "50%",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: 700,
                 background: TEXT_COLORS[t.type],
                 color: "#fff",
@@ -121,13 +121,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             >
               {ICONS[t.type]}
             </span>
-            <span style={{ flex: 1, lineHeight: 1.4 }}>{t.message}</span>
+            <span style={{ flex: 1, lineHeight: 1.5 }}>{t.message}</span>
           </div>
         ))}
       </div>
       <style>{`
         @keyframes toast-slide-in {
-          from { opacity: 0; transform: translateX(100%); }
+          from { opacity: 0; transform: translateX(80px); }
           to { opacity: 1; transform: translateX(0); }
         }
       `}</style>
