@@ -195,6 +195,46 @@ body {
   color: var(--el-text-color-placeholder);
 }
 
+.el-input__prefix {
+  position: absolute;
+  left: 8px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  color: var(--el-text-color-placeholder);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.el-input:focus-within .el-input__prefix {
+  color: var(--el-color-primary);
+}
+
+.el-date-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+
+.el-date-picker .el-input__inner::-webkit-calendar-picker-indicator {
+  opacity: 0.5;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.el-date-picker .el-input__inner::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+.el-date-picker__separator {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  user-select: none;
+}
+
 .el-select {
   display: inline-flex;
   height: 32px;

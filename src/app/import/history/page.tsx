@@ -82,24 +82,44 @@ export default function HistoryPage() {
               onChange={(e) => { setReceiverName(e.target.value); setPage(1); }}
             />
           </div>
-          <div className="el-input" style={{ width: 180 }}>
-            <input
-              className="el-input__inner"
-              type="date"
-              value={startDate}
-              onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-              style={{ color: startDate ? undefined : "var(--el-text-color-placeholder)" }}
-            />
-          </div>
-          <span style={{ display: "flex", alignItems: "center", color: "var(--el-text-color-secondary)", fontSize: 13 }}>至</span>
-          <div className="el-input" style={{ width: 180 }}>
-            <input
-              className="el-input__inner"
-              type="date"
-              value={endDate}
-              onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-              style={{ color: endDate ? undefined : "var(--el-text-color-placeholder)" }}
-            />
+          <div className="el-date-picker">
+            <div className="el-input" style={{ width: 160 }}>
+              <span className="el-input__prefix">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <rect x="1" y="2" width="12" height="11" rx="2" stroke="currentColor" strokeWidth="1.2"/>
+                  <line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" strokeWidth="1.2"/>
+                  <line x1="4" y1="0.5" x2="4" y2="3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  <line x1="10" y1="0.5" x2="10" y2="3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+              </span>
+              <input
+                className="el-input__inner"
+                type="date"
+                value={startDate}
+                onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+                placeholder="开始日期"
+                style={{ paddingLeft: 28, color: startDate ? undefined : "var(--el-text-color-placeholder)" }}
+              />
+            </div>
+            <span className="el-date-picker__separator">至</span>
+            <div className="el-input" style={{ width: 160 }}>
+              <span className="el-input__prefix">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <rect x="1" y="2" width="12" height="11" rx="2" stroke="currentColor" strokeWidth="1.2"/>
+                  <line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" strokeWidth="1.2"/>
+                  <line x1="4" y1="0.5" x2="4" y2="3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  <line x1="10" y1="0.5" x2="10" y2="3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+              </span>
+              <input
+                className="el-input__inner"
+                type="date"
+                value={endDate}
+                onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+                placeholder="结束日期"
+                style={{ paddingLeft: 28, color: endDate ? undefined : "var(--el-text-color-placeholder)" }}
+              />
+            </div>
           </div>
         </div>
 
