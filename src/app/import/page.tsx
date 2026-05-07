@@ -67,8 +67,8 @@ function ImportFlow() {
           </div>
         </div>
       )}
-      {step === "preview" && <ImportPreview />}
-      {(step === "submitting" || step === "result") && <ImportResult />}
+      {(step === "preview" || step === "submitting") && <ImportPreview />}
+      {step === "result" && <ImportResult />}
     </div>
   );
 }

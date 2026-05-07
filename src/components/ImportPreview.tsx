@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useRef } from "react";
+import { useCallback, useState, useRef, useMemo } from "react";
 import { useImport } from "@/store/import-context";
 import ExcelTable from "./ExcelTable";
 import { generateExcelBuffer } from "@/lib/excel-parser";
@@ -23,8 +23,12 @@ export default function ImportPreview() {
   const [submitting, setSubmitting] = useState(false);
   const [submitProgress, setSubmitProgress] = useState(0);
   const [submitLabel, setSubmitLabel] = useState("");
+  const [successCount, setSuccessCount] = useState(0);
+  const [failCount, setFailCount] = useState(0);
+  const [currentChunk, setCurrentChunk] = useState(0);
   const abortRef = useRef(false);
 
+  const totalChunks = useMemo(() => Math.ceil(rows.length / CHUNK_SIZE), [rows.length]);
   const hasErrors = validationResults.some((vr) => vr.errors.length > 0);
 
   const handleExport = useCallback(() => {
@@ -52,12 +56,16 @@ export default function ImportPreview() {
     setStep("submitting");
     setSubmitProgress(0);
     setSubmitLabel("正在准备数据...");
+    setSuccessCount(0);
+    setFailCount(0);
+    setCurrentChunk(0);
     abortRef.current = false;
 
     const total = rows.length;
     let totalSuccess = 0;
     let totalFail = 0;
     let batchId: string | null = null;
+    const startTime = Date.now();
 
     try {
       for (let start = 0; start < total; start += CHUNK_SIZE) {
@@ -65,9 +73,12 @@ export default function ImportPreview() {
 
         const chunk = rows.slice(start, start + CHUNK_SIZE);
         const end = Math.min(start + CHUNK_SIZE, total);
+        const chunkNum = Math.floor(start / CHUNK_SIZE) + 1;
+        const pct = Math.round((end / total) * 100);
 
-        setSubmitProgress(Math.round((end / total) * 100));
-        setSubmitLabel(`正在提交 ${start + 1}-${end} / ${total} 条...`);
+        setCurrentChunk(chunkNum);
+        setSubmitProgress(pct);
+        setSubmitLabel(`正在提交 ${start + 1}-${end} / ${total} 条`);
 
         const submitRes: Response = await fetch("/api/import/submit", {
           method: "POST",
@@ -84,6 +95,8 @@ export default function ImportPreview() {
         batchId = result.batchId;
         totalSuccess += result.successCount;
         totalFail += result.failCount;
+        setSuccessCount(totalSuccess);
+        setFailCount(totalFail);
       }
 
       if (batchId) {
@@ -94,12 +107,15 @@ export default function ImportPreview() {
         }).catch(() => {});
       }
 
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
       setSubmitProgress(100);
       setSubmitLabel("提交完成");
+      setSuccessCount(totalSuccess);
+      setFailCount(totalFail);
 
-      toast("success", `成功提交 ${totalSuccess} 条${totalFail > 0 ? `，${totalFail} 条失败` : ""}`);
+      toast("success", `导入完成！成功 ${totalSuccess} 条${totalFail > 0 ? `，失败 ${totalFail} 条` : ""}（耗时 ${elapsed}s）`);
 
-      await new Promise((r) => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 500));
 
       setBatchId(batchId || "");
       setBatchResult({
@@ -120,36 +136,8 @@ export default function ImportPreview() {
     }
   };
 
-  if (step === "submitting") {
-    return (
-      <div className="el-card" style={{ textAlign: "center", padding: 60 }}>
-        <div style={{ fontSize: 14, color: "var(--el-text-color-regular)", marginBottom: 24, fontWeight: 500 }}>
-          {submitLabel}
-        </div>
-        <div style={{ maxWidth: 400, margin: "0 auto" }}>
-          <div className="el-progress-bar" style={{ height: 10 }}>
-            <div
-              className="el-progress-bar__inner"
-              style={{
-                width: `${submitProgress}%`,
-                transition: "width 0.3s ease",
-                background: submitProgress === 100 ? "var(--el-color-success)" : undefined,
-              }}
-            />
-          </div>
-        </div>
-        <p style={{ fontSize: 13, color: "var(--el-text-color-secondary)", marginTop: 12 }}>
-          {submitProgress}%
-        </p>
-        <p style={{ fontSize: 12, color: "var(--el-text-color-placeholder)", marginTop: 4 }}>
-          {submitting ? "请勿关闭页面..." : ""}
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="el-card">
+    <div className="el-card" style={{ position: "relative" }}>
       <div className="el-card__header">
         <span style={{ fontWeight: 500, fontSize: 16 }}>数据预览与编辑</span>
         <div style={{ display: "flex", gap: 8 }}>
@@ -182,9 +170,88 @@ export default function ImportPreview() {
           </button>
         </div>
       </div>
-      <div className="el-card__body">
+      <div className="el-card__body" style={{ opacity: step === "submitting" ? 0.3 : 1, transition: "opacity 0.3s" }}>
         <ExcelTable />
       </div>
+
+      {/* Overlay progress modal */}
+      {(step === "submitting" || submitProgress === 100) && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(255,255,255,0.8)",
+            backdropFilter: "blur(2px)",
+            borderRadius: "var(--el-border-radius-base)",
+            zIndex: 10,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 12,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+              padding: "36px 48px",
+              maxWidth: 480,
+              width: "90%",
+              textAlign: "center",
+            }}
+          >
+            {submitProgress < 100 ? (
+              <>
+                <div style={{ marginBottom: 20 }}>
+                  <svg width="40" height="40" viewBox="0 0 40 40" style={{ display: "inline-block" }}>
+                    <circle cx="20" cy="20" r="16" fill="none" stroke="var(--el-border-color-lighter)" strokeWidth="4"/>
+                    <circle
+                      cx="20" cy="20" r="16" fill="none" stroke="var(--el-color-primary)" strokeWidth="4"
+                      strokeDasharray={`${(submitProgress / 100) * 100.5} 100.5`}
+                      strokeLinecap="round"
+                      transform="rotate(-90 20 20)"
+                      style={{ transition: "stroke-dasharray 0.3s ease" }}
+                    />
+                    <text x="20" y="24" textAnchor="middle" fontSize="12" fontWeight="600" fill="var(--el-text-color-primary)">
+                      {submitProgress}%
+                    </text>
+                  </svg>
+                </div>
+                <p style={{ fontSize: 16, fontWeight: 600, color: "var(--el-text-color-primary)", marginBottom: 4 }}>
+                  {submitLabel}
+                </p>
+                <p style={{ fontSize: 13, color: "var(--el-text-color-secondary)", marginBottom: 16 }}>
+                  第 {currentChunk}/{totalChunks} 批
+                </p>
+                <div className="el-progress-bar" style={{ height: 6, marginBottom: 16 }}>
+                  <div className="el-progress-bar__inner" style={{ width: `${submitProgress}%`, transition: "width 0.3s ease" }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "center", gap: 24, fontSize: 13 }}>
+                  <span style={{ color: "var(--el-color-success)" }}>成功 {successCount}</span>
+                  {failCount > 0 && <span style={{ color: "var(--el-color-danger)" }}>失败 {failCount}</span>}
+                </div>
+                <p style={{ fontSize: 12, color: "var(--el-text-color-placeholder)", marginTop: 12 }}>正在提交数据，请勿关闭页面</p>
+              </>
+            ) : (
+              <>
+                <div style={{ marginBottom: 16, animation: "scaleIn 0.3s ease" }}>
+                  <svg width="52" height="52" viewBox="0 0 52 52">
+                    <circle cx="26" cy="26" r="24" fill="var(--el-color-success-light-9)" stroke="var(--el-color-success)" strokeWidth="2.5"/>
+                    <path d="M18 26l6 6 12-12" fill="none" stroke="var(--el-color-success)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "drawCheck 0.4s ease 0.1s both" }}/>
+                  </svg>
+                </div>
+                <p style={{ fontSize: 18, fontWeight: 700, color: "var(--el-text-color-primary)", marginBottom: 12 }}>
+                  提交完成
+                </p>
+                <div style={{ display: "flex", justifyContent: "center", gap: 32, fontSize: 15 }}>
+                  <span style={{ color: "var(--el-color-success)", fontWeight: 700 }}>成功 {successCount}</span>
+                  {failCount > 0 && <span style={{ color: "var(--el-color-danger)", fontWeight: 700 }}>失败 {failCount}</span>}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -140,16 +140,28 @@ export default function FileUploader() {
         onClick={onClick}
       >
         {parsing ? (
-          <div style={{ textAlign: "center", padding: "8px 0" }}>
-            <div style={{ fontSize: 14, color: "var(--el-text-color-regular)", marginBottom: 16, fontWeight: 500 }}>
+          <div style={{ textAlign: "center", padding: "16px 0" }}>
+            <div style={{ marginBottom: 16 }}>
+              <svg width="48" height="48" viewBox="0 0 48 48" style={{ display: "inline-block" }}>
+                <circle cx="24" cy="24" r="20" fill="none" stroke="var(--el-border-color-lighter)" strokeWidth="4"/>
+                <circle
+                  cx="24" cy="24" r="20" fill="none" stroke="var(--el-color-primary)" strokeWidth="4"
+                  strokeDasharray={`${(parseProgress / 100) * 125.6} 125.6`}
+                  strokeLinecap="round"
+                  transform="rotate(-90 24 24)"
+                  style={{ transition: "stroke-dasharray 0.4s ease" }}
+                />
+                <text x="24" y="29" textAnchor="middle" fontSize="14" fontWeight="600" fill="var(--el-text-color-primary)">
+                  {parseProgress}%
+                </text>
+              </svg>
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--el-text-color-primary)", marginBottom: 8 }}>
               {parseLabel}
             </div>
-            <div className="el-progress-bar" style={{ height: 8, maxWidth: 320, margin: "0 auto" }}>
-              <div className="el-progress-bar__inner" style={{ width: `${parseProgress}%` }} />
+            <div className="el-progress-bar" style={{ height: 6, maxWidth: 320, margin: "0 auto" }}>
+              <div className="el-progress-bar__inner" style={{ width: `${parseProgress}%`, transition: "width 0.4s ease" }} />
             </div>
-            <p style={{ fontSize: 12, color: "var(--el-text-color-placeholder)", marginTop: 8 }}>
-              {parseProgress}%
-            </p>
           </div>
         ) : (
           <>
