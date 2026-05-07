@@ -80,3 +80,14 @@ export const FIELD_LABELS: FieldLabelMap = {
   externalCode: "客户单号",
   remark: "备注",
 };
+
+export const FIELD_ALIASES: FieldLabelMap = {
+  "发件人": "senderName",
+  "发件电话": "senderPhone",
+  "发件地址": "senderAddress",
+  "收件人": "receiverName",
+  "收件电话": "receiverPhone",
+  "收件地址": "receiverAddress",
+  "外部编码": "externalCode",
+  "重量(kg)": "weight",
+};

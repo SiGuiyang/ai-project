@@ -1,6 +1,19 @@
 import * as XLSX from "xlsx";
 import type { ParsedData } from "@/types";
 
+const CATEGORY_ROW_KEYWORDS = ["发件方", "收件方", "货物", "信息"];
+
+function isCategoryRow(row: (string | undefined)[]): boolean {
+  const nonEmpty: string[] = [];
+  for (const v of row) {
+    if (v && v.trim()) nonEmpty.push(v);
+  }
+  if (nonEmpty.length === 0) return false;
+  return nonEmpty.some((v) =>
+    CATEGORY_ROW_KEYWORDS.some((kw) => v.includes(kw))
+  );
+}
+
 export function parseExcelFile(
   buffer: ArrayBuffer
 ): { success: true; data: ParsedData } | { success: false; error: string } {
@@ -18,33 +31,60 @@ export function parseExcelFile(
       return { success: false, error: `Sheet "${firstSheetName}" 为空` };
     }
 
-    const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, {
+    // Read raw rows as arrays to detect multi-row headers
+    const rawRows = XLSX.utils.sheet_to_json<(string | undefined)[]>(sheet, {
+      header: 1,
       defval: "",
-      header: "A",
-    });
+    }) as (string | undefined)[][];
 
-    if (jsonData.length === 0) {
+    if (rawRows.length === 0) {
       return { success: false, error: "文件中没有数据" };
     }
 
-    const headers = Object.keys(jsonData[0]);
-    if (headers.length === 0) {
+    let headerRowIndex = 0;
+    let dataStartIndex = 1;
+
+    // Detect if first row is a category/merged header row
+    if (isCategoryRow(rawRows[0])) {
+      headerRowIndex = 1;
+      dataStartIndex = 2;
+    }
+
+    // If there's no explicit header row beyond categories, check row 0
+    if (headerRowIndex >= rawRows.length) {
+      return { success: false, error: "无法识别表头行" };
+    }
+
+    const rawHeaders = rawRows[headerRowIndex]
+      .filter((h): h is string => h !== undefined)
+      .map((h) => h.trim());
+
+    if (rawHeaders.length === 0 || rawHeaders.every((h) => !h)) {
       return { success: false, error: "表头行为空" };
     }
 
-    const dataRows = jsonData.slice(1).filter((row) =>
-      Object.values(row).some((v) => v !== "")
+    const dataRows = rawRows.slice(dataStartIndex).filter(
+      (row) => row && row.some((v) => v && v.trim() !== "")
     );
 
     if (dataRows.length === 0) {
       return { success: false, error: "除表头外没有数据行" };
     }
 
+    // Convert data rows to Record<string, string>
+    const parsedRows: Record<string, string>[] = dataRows.map((row) => {
+      const record: Record<string, string> = {};
+      rawHeaders.forEach((header, idx) => {
+        record[header] = row[idx] !== undefined ? String(row[idx]).trim() : "";
+      });
+      return record;
+    });
+
     return {
       success: true,
       data: {
-        headers,
-        rows: dataRows,
+        headers: rawHeaders,
+        rows: parsedRows,
       },
     };
   } catch (e) {

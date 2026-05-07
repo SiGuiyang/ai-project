@@ -1,5 +1,5 @@
 import type { ColumnMapping } from "@/types";
-import { FIELD_LABELS } from "@/types";
+import { FIELD_LABELS, FIELD_ALIASES } from "@/types";
 
 const TEMPLATE_MAP_STORAGE_KEY = "template-mappings";
 
@@ -36,10 +36,31 @@ const DEFAULT_TEMPLATES: { name: string; mapping: ColumnMapping }[] = [
       "Remark": "remark",
     },
   },
+  {
+    name: "模板C（分组表头）",
+    mapping: {
+      "发件人": "senderName",
+      "发件电话": "senderPhone",
+      "发件地址": "senderAddress",
+      "外部编码": "externalCode",
+      "收件人": "receiverName",
+      "收件电话": "receiverPhone",
+      "收件地址": "receiverAddress",
+      "备注": "remark",
+      "重量(kg)": "weight",
+      "件数": "pieces",
+      "温层": "temperatureLevel",
+    },
+  },
 ];
 
 function normalizeHeader(header: string): string {
-  return header.trim().toLowerCase().replace(/[\s_-]+/g, "");
+  return header
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "")
+    .replace(/[（(][^）)]*[）)]/g, "")
+    .replace(/[（）()]/g, "");
 }
 
 function computeSimilarity(excelHeaders: string[], mapping: ColumnMapping): number {
@@ -110,11 +131,23 @@ export function autoSuggestMapping(
 ): ColumnMapping {
   const mapping: ColumnMapping = {};
   const fieldLabels = Object.entries(FIELD_LABELS);
+  const aliases = Object.entries(FIELD_ALIASES);
 
   for (const header of excelHeaders) {
     const normalized = normalizeHeader(header);
     let matched = false;
 
+    // Check direct aliases first
+    for (const [aliasHeader, field] of aliases) {
+      if (normalized === normalizeHeader(aliasHeader)) {
+        mapping[header] = field;
+        matched = true;
+        break;
+      }
+    }
+    if (matched) continue;
+
+    // Check field labels
     for (const [field, label] of fieldLabels) {
       if (
         normalized === normalizeHeader(label) ||
