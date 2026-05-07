@@ -3,6 +3,10 @@ import type { ParsedData } from "@/types";
 
 const CATEGORY_ROW_KEYWORDS = ["发件方", "收件方", "货物", "信息"];
 
+function isRowEmpty(row: (string | undefined)[]): boolean {
+  return row.every((v) => !v || String(v).trim() === "");
+}
+
 function isCategoryRow(row: (string | undefined)[]): boolean {
   const nonEmpty: string[] = [];
   for (const v of row) {
@@ -41,13 +45,26 @@ export function parseExcelFile(
       return { success: false, error: "文件中没有数据" };
     }
 
-    let headerRowIndex = 0;
-    let dataStartIndex = 1;
+    // Skip leading blank rows
+    let contentStartIndex = 0;
+    while (
+      contentStartIndex < rawRows.length &&
+      isRowEmpty(rawRows[contentStartIndex])
+    ) {
+      contentStartIndex++;
+    }
 
-    // Detect if first row is a category/merged header row
-    if (isCategoryRow(rawRows[0])) {
-      headerRowIndex = 1;
-      dataStartIndex = 2;
+    if (contentStartIndex >= rawRows.length) {
+      return { success: false, error: "文件中没有数据" };
+    }
+
+    let headerRowIndex = contentStartIndex;
+    let dataStartIndex = headerRowIndex + 1;
+
+    // Detect if first content row is a category/merged header row
+    if (isCategoryRow(rawRows[headerRowIndex])) {
+      headerRowIndex++;
+      dataStartIndex = headerRowIndex + 1;
     }
 
     // If there's no explicit header row beyond categories, check row 0
