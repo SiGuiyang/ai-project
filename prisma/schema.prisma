@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Waybill {
+  id               String   @id @default(cuid())
+  batchId          String
+  externalCode     String?
+  senderName       String
+  senderPhone      String
+  senderAddress    String
+  receiverName     String
+  receiverPhone    String
+  receiverAddress  String
+  weight           Float
+  pieces           Int
+  temperatureLevel String
+  remark           String?
+  batch            ImportBatch @relation(fields: [batchId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([batchId])
+  @@index([externalCode])
+  @@index([receiverName])
+  @@index([createdAt])
+}
+
+model ImportBatch {
+  id           String   @id @default(cuid())
+  status       String   @default("pending")
+  totalCount   Int      @default(0)
+  successCount Int      @default(0)
+  failCount    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  waybills Waybill[]
+}
+
+model TemplateMapping {
+  id              String   @id @default(cuid())
+  templateHash    String   @unique
+  columnMappings  String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([templateHash])
+}
