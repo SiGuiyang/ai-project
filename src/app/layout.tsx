@@ -72,7 +72,7 @@ export default function RootLayout({
                   borderRadius: "var(--el-border-radius-base)",
                 }}
               >
-                历史记录
+                运单列表
               </a>
             </nav>
           </header>
