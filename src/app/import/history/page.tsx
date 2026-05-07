@@ -35,13 +35,9 @@ export default function HistoryPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(pageSize),
-      });
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (externalCode) params.set("externalCode", externalCode);
       if (receiverName) params.set("receiverName", receiverName);
-
       const res = await fetch(`/api/waybills?${params}`);
       const json = await res.json();
       setData(json);
@@ -57,71 +53,85 @@ export default function HistoryPage() {
   }, [fetchData]);
 
   return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-lg p-6 border">
-        <h2 className="text-lg font-medium mb-4">已导入运单记录</h2>
-
-        <div className="flex gap-3 mb-4">
-          <input
-            className="border rounded px-3 py-2 text-sm flex-1 max-w-xs"
-            placeholder="搜索客户单号"
-            value={externalCode}
-            onChange={(e) => {
-              setExternalCode(e.target.value);
-              setPage(1);
-            }}
-          />
-          <input
-            className="border rounded px-3 py-2 text-sm flex-1 max-w-xs"
-            placeholder="搜索收件人姓名"
-            value={receiverName}
-            onChange={(e) => {
-              setReceiverName(e.target.value);
-              setPage(1);
-            }}
-          />
+    <div className="el-card">
+      <div className="el-card__header">
+        <span style={{ fontWeight: 500, fontSize: 16 }}>已导入运单记录</span>
+        <span style={{ fontSize: 13, color: "var(--el-text-color-secondary)" }}>
+          {data ? `共 ${data.total} 条` : ""}
+        </span>
+      </div>
+      <div className="el-card__body">
+        <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+          <div className="el-input" style={{ flex: 1, maxWidth: 260 }}>
+            <input
+              className="el-input__inner"
+              placeholder="搜索客户单号"
+              value={externalCode}
+              onChange={(e) => { setExternalCode(e.target.value); setPage(1); }}
+            />
+          </div>
+          <div className="el-input" style={{ flex: 1, maxWidth: 260 }}>
+            <input
+              className="el-input__inner"
+              placeholder="搜索收件人姓名"
+              value={receiverName}
+              onChange={(e) => { setReceiverName(e.target.value); setPage(1); }}
+            />
+          </div>
         </div>
 
         {loading ? (
-          <div className="text-center py-8 text-gray-500">加载中...</div>
+          <div className="el-empty">
+            <div className="el-empty__icon">
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                <circle cx="24" cy="24" r="20" stroke="var(--el-border-color)" strokeWidth="2" strokeDasharray="4 4">
+                  <animateTransform attributeName="transform" type="rotate" from="0 24 24" to="360 24 24" dur="1s" repeatCount="indefinite" />
+                </circle>
+              </svg>
+            </div>
+            <div className="el-empty__text">加载中...</div>
+          </div>
         ) : !data || data.data.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">暂无记录</div>
+          <div className="el-empty">
+            <div className="el-empty__icon">
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                <rect x="8" y="12" width="32" height="28" rx="2" stroke="var(--el-border-color)" strokeWidth="2"/>
+                <line x1="14" y1="20" x2="34" y2="20" stroke="var(--el-border-color)" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="14" y1="26" x2="30" y2="26" stroke="var(--el-border-color)" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="14" y1="32" x2="26" y2="32" stroke="var(--el-border-color)" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <div className="el-empty__text">暂无记录</div>
+          </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
+            <div style={{ overflowX: "auto" }}>
+              <table className="el-table" style={{ minWidth: 1000 }}>
                 <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border px-3 py-2">客户单号</th>
-                    <th className="border px-3 py-2">发件人</th>
-                    <th className="border px-3 py-2">发件人电话</th>
-                    <th className="border px-3 py-2">收件人</th>
-                    <th className="border px-3 py-2">收件人电话</th>
-                    <th className="border px-3 py-2">重量</th>
-                    <th className="border px-3 py-2">件数</th>
-                    <th className="border px-3 py-2">温层</th>
-                    <th className="border px-3 py-2">提交时间</th>
+                  <tr>
+                    <th className="el-table__header">客户单号</th>
+                    <th className="el-table__header">发件人</th>
+                    <th className="el-table__header">发件人电话</th>
+                    <th className="el-table__header">收件人</th>
+                    <th className="el-table__header">收件人电话</th>
+                    <th className="el-table__header">重量</th>
+                    <th className="el-table__header">件数</th>
+                    <th className="el-table__header">温层</th>
+                    <th className="el-table__header">提交时间</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.data.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="hover:bg-gray-50"
-                    >
-                      <td className="border px-3 py-1">
-                        {row.externalCode || "-"}
-                      </td>
-                      <td className="border px-3 py-1">{row.senderName}</td>
-                      <td className="border px-3 py-1">{row.senderPhone}</td>
-                      <td className="border px-3 py-1">{row.receiverName}</td>
-                      <td className="border px-3 py-1">{row.receiverPhone}</td>
-                      <td className="border px-3 py-1">{row.weight}</td>
-                      <td className="border px-3 py-1">{row.pieces}</td>
-                      <td className="border px-3 py-1">
-                        {row.temperatureLevel}
-                      </td>
-                      <td className="border px-3 py-1 whitespace-nowrap">
+                    <tr key={row.id}>
+                      <td>{row.externalCode || <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
+                      <td>{row.senderName}</td>
+                      <td>{row.senderPhone}</td>
+                      <td>{row.receiverName}</td>
+                      <td>{row.receiverPhone}</td>
+                      <td>{row.weight}</td>
+                      <td>{row.pieces}</td>
+                      <td><span className={`el-tag el-tag--${row.temperatureLevel === "常温" ? "success" : row.temperatureLevel === "冷藏" ? "primary" : "warning"}`}>{row.temperatureLevel}</span></td>
+                      <td style={{ whiteSpace: "nowrap", color: "var(--el-text-color-secondary)", fontSize: 13 }}>
                         {new Date(row.createdAt).toLocaleString("zh-CN")}
                       </td>
                     </tr>
@@ -130,25 +140,31 @@ export default function HistoryPage() {
               </table>
             </div>
 
-            <div className="flex items-center justify-between mt-4 text-sm">
-              <span className="text-gray-500">
-                共 {data.total} 条记录，第 {data.page}/{data.totalPages} 页
+            <div className="el-pagination">
+              <span className="el-pagination__total">
+                共 {data.total} 条，第 {data.page}/{data.totalPages} 页
               </span>
-              <div className="flex gap-2">
-                <button
-                  className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  上一页
-                </button>
-                <button
-                  className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50"
-                  disabled={page >= data.totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  下一页
-                </button>
+              <div style={{ display: "flex", gap: 4 }}>
+                <button className="el-pagination__btn" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>上一页</button>
+                {Array.from({ length: data.totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === data.totalPages || Math.abs(p - page) <= 2)
+                  .map((p, idx, arr) => (
+                    <span key={p} style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+                      {idx > 0 && arr[idx - 1] !== p - 1 && <span style={{ color: "var(--el-text-color-placeholder)", padding: "0 4px" }}>...</span>}
+                      <button
+                        className="el-pagination__btn"
+                        style={{
+                          background: p === page ? "var(--el-color-primary)" : undefined,
+                          borderColor: p === page ? "var(--el-color-primary)" : undefined,
+                          color: p === page ? "#fff" : undefined,
+                        }}
+                        onClick={() => setPage(p)}
+                      >
+                        {p}
+                      </button>
+                    </span>
+                  ))}
+                <button className="el-pagination__btn" disabled={page >= data.totalPages} onClick={() => setPage((p) => p + 1)}>下一页</button>
               </div>
             </div>
           </>

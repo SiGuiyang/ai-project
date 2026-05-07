@@ -21,8 +21,8 @@ const SYSTEM_FIELDS = [
   { value: "weight", label: "重量" },
   { value: "pieces", label: "件数" },
   { value: "temperatureLevel", label: "温层" },
-  { value: "externalCode", label: "客户单号" },
-  { value: "remark", label: "备注" },
+  { value: "externalCode", label: "客户单号（选填）" },
+  { value: "remark", label: "备注（选填）" },
 ];
 
 export default function TemplateMatcher() {
@@ -63,40 +63,42 @@ export default function TemplateMatcher() {
   };
 
   const usedFields = Object.values(mapping).filter(Boolean);
-  const requiredUnmapped = SYSTEM_FIELDS.filter(
-    (f) =>
-      f.value &&
-      ["senderName","senderPhone","senderAddress","receiverName","receiverPhone","receiverAddress","weight","pieces","temperatureLevel"].includes(f.value) &&
-      !usedFields.includes(f.value)
-  );
+  const requiredFields = ["senderName","senderPhone","senderAddress","receiverName","receiverPhone","receiverAddress","weight","pieces","temperatureLevel"];
+  const requiredUnmapped = requiredFields.filter((f) => !usedFields.includes(f));
+  const fieldLabelMap: Record<string, string> = {
+    senderName: "发件人姓名", senderPhone: "发件人电话", senderAddress: "发件人地址",
+    receiverName: "收件人姓名", receiverPhone: "收件人电话", receiverAddress: "收件人地址",
+    weight: "重量", pieces: "件数", temperatureLevel: "温层",
+  };
 
   return (
-    <div className="space-y-4">
-      <div className="bg-blue-50 border border-blue-200 rounded px-4 py-3 text-sm text-blue-700">
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="el-alert el-alert--info">
         {detectedTemplate
           ? `已自动识别模板：${detectedTemplate}`
           : "未能自动识别模板，请手动设置列映射关系"}
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
+      <div style={{ overflowX: "auto" }}>
+        <table className="el-table">
           <thead>
-            <tr className="bg-gray-100">
-              <th className="border px-3 py-2 text-left">Excel 列名</th>
-              <th className="border px-3 py-2 text-left">示例数据</th>
-              <th className="border px-3 py-2 text-left">映射到系统字段</th>
+            <tr>
+              <th className="el-table__header">Excel 列名</th>
+              <th className="el-table__header">示例数据</th>
+              <th className="el-table__header">映射到系统字段</th>
             </tr>
           </thead>
           <tbody>
             {parsedData.headers.map((header) => (
-              <tr key={header} className="hover:bg-gray-50">
-                <td className="border px-3 py-2 font-medium">{header}</td>
-                <td className="border px-3 py-2 text-gray-500 max-w-[200px] truncate">
+              <tr key={header}>
+                <td style={{ fontWeight: 500 }}>{header}</td>
+                <td style={{ color: "var(--el-text-color-secondary)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {parsedData.rows[0]?.[header] ?? ""}
                 </td>
-                <td className="border px-3 py-2">
+                <td>
                   <select
-                    className="w-full border rounded px-2 py-1 text-sm"
+                    className="el-input__inner"
+                    style={{ width: 200, height: 28, fontSize: 13 }}
                     value={mapping[header] ?? ""}
                     onChange={(e) => handleChange(header, e.target.value)}
                   >
@@ -114,16 +116,17 @@ export default function TemplateMatcher() {
       </div>
 
       {requiredUnmapped.length > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded px-4 py-3 text-sm text-yellow-700">
-          以下必填字段尚未映射：{requiredUnmapped.map((f) => f.label).join("、")}
+        <div className="el-alert el-alert--warning">
+          以下必填字段尚未映射：{requiredUnmapped.map((f) => fieldLabelMap[f] || f).join("、")}
         </div>
       )}
 
-      <div className="flex justify-end">
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
         <button
-          className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+          className="el-button el-button--primary"
           onClick={handleApply}
           disabled={requiredUnmapped.length > 0}
+          style={{ opacity: requiredUnmapped.length > 0 ? 0.5 : undefined, cursor: requiredUnmapped.length > 0 ? "not-allowed" : undefined }}
         >
           确认映射并预览数据
         </button>

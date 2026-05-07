@@ -13,29 +13,70 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN">
-      <body className="min-h-screen bg-gray-50">
-        <nav className="bg-white border-b sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-6">
-            <a href="/import" className="font-bold text-lg text-gray-800">
-              运单批量导入
+      <body>
+        <header
+          style={{
+            height: 48,
+            background: "#fff",
+            borderBottom: "1px solid var(--el-border-color-light)",
+            display: "flex",
+            alignItems: "center",
+            padding: "0 24px",
+            position: "sticky",
+            top: 0,
+            zIndex: 100,
+            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+          }}
+        >
+          <a
+            href="/import"
+            style={{
+              fontSize: 16,
+              fontWeight: 600,
+              color: "var(--el-text-color-primary)",
+              textDecoration: "none",
+              marginRight: 32,
+            }}
+          >
+            运单批量导入
+          </a>
+          <nav style={{ display: "flex", gap: 4 }}>
+            <a
+              href="/import"
+              style={{
+                height: 32,
+                padding: "0 12px",
+                display: "inline-flex",
+                alignItems: "center",
+                fontSize: 14,
+                color: "var(--el-color-primary)",
+                textDecoration: "none",
+                borderRadius: "var(--el-border-radius-base)",
+                background: "var(--el-color-primary-light-9)",
+              }}
+            >
+              导入
             </a>
-            <div className="flex gap-4 text-sm">
-              <a
-                href="/import"
-                className="text-gray-600 hover:text-blue-600 transition-colors"
-              >
-                导入
-              </a>
-              <a
-                href="/import/history"
-                className="text-gray-600 hover:text-blue-600 transition-colors"
-              >
-                历史记录
-              </a>
-            </div>
-          </div>
-        </nav>
-        <main className="max-w-7xl mx-auto px-4 py-6">{children}</main>
+            <a
+              href="/import/history"
+              style={{
+                height: 32,
+                padding: "0 12px",
+                display: "inline-flex",
+                alignItems: "center",
+                fontSize: 14,
+                color: "var(--el-text-color-regular)",
+                textDecoration: "none",
+                borderRadius: "var(--el-border-radius-base)",
+              }}
+            >
+              历史记录
+            </a>
+          </nav>
+        </header>
+        <main style={{ maxWidth: 1200, margin: "0 auto", padding: "24px" }}>
+          {children}
+        </main>
       </body>
     </html>
   );

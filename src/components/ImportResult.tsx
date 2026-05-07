@@ -8,56 +8,41 @@ export default function ImportResult() {
   if (step !== "result" || !batchResult) return null;
 
   return (
-    <div className="bg-white rounded-lg p-6 border space-y-6">
-      <h2 className="text-lg font-medium">提交结果</h2>
+    <div className="el-card">
+      <div className="el-card__body" style={{ textAlign: "center", padding: 40 }}>
+        <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 24 }}>提交结果</div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-blue-50 border border-blue-200 rounded p-4 text-center">
-          <p className="text-2xl font-bold text-blue-600">
-            {batchResult.totalCount}
-          </p>
-          <p className="text-sm text-blue-700">总条数</p>
+        <div style={{ display: "flex", justifyContent: "center", gap: 24, marginBottom: 32 }}>
+          <div style={{ textAlign: "center", minWidth: 120 }}>
+            <div style={{ fontSize: 32, fontWeight: 700, color: "var(--el-color-primary)" }}>{batchResult.totalCount}</div>
+            <div style={{ fontSize: 13, color: "var(--el-text-color-secondary)", marginTop: 4 }}>总条数</div>
+          </div>
+          <div style={{ width: 1, background: "var(--el-border-color-light)", alignSelf: "stretch" }} />
+          <div style={{ textAlign: "center", minWidth: 120 }}>
+            <div style={{ fontSize: 32, fontWeight: 700, color: "var(--el-color-success)" }}>{batchResult.successCount}</div>
+            <div style={{ fontSize: 13, color: "var(--el-text-color-secondary)", marginTop: 4 }}>成功</div>
+          </div>
+          <div style={{ width: 1, background: "var(--el-border-color-light)", alignSelf: "stretch" }} />
+          <div style={{ textAlign: "center", minWidth: 120 }}>
+            <div style={{ fontSize: 32, fontWeight: 700, color: "var(--el-color-danger)" }}>{batchResult.failCount}</div>
+            <div style={{ fontSize: 13, color: "var(--el-text-color-secondary)", marginTop: 4 }}>失败</div>
+          </div>
         </div>
-        <div className="bg-green-50 border border-green-200 rounded p-4 text-center">
-          <p className="text-2xl font-bold text-green-600">
-            {batchResult.successCount}
-          </p>
-          <p className="text-sm text-green-700">成功</p>
-        </div>
-        <div className="bg-red-50 border border-red-200 rounded p-4 text-center">
-          <p className="text-2xl font-bold text-red-600">
-            {batchResult.failCount}
-          </p>
-          <p className="text-sm text-red-700">失败</p>
-        </div>
-      </div>
 
-      {batchResult.failCount > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded p-4">
-          <p className="text-sm text-yellow-700">
+        {batchResult.failCount > 0 && (
+          <div className="el-alert el-alert--warning" style={{ marginBottom: 24, textAlign: "left" }}>
             部分数据提交失败，失败的条数不会影响已成功提交的数据。
-          </p>
-        </div>
-      )}
+          </div>
+        )}
 
-      <div className="flex gap-3">
-        <button
-          className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          onClick={() => {
-            reset();
-            setStep("upload");
-          }}
-        >
-          继续导入
-        </button>
-        <button
-          className="px-6 py-2 border rounded hover:bg-gray-50"
-          onClick={() => {
-            window.location.href = "/import/history";
-          }}
-        >
-          查看历史记录
-        </button>
+        <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
+          <button className="el-button el-button--primary" onClick={() => { reset(); setStep("upload"); }}>
+            继续导入
+          </button>
+          <button className="el-button el-button--plain" onClick={() => { window.location.href = "/import/history"; }}>
+            查看历史记录
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -9,34 +9,16 @@ import { getFieldValue } from "@/lib/helpers";
 import { saveAs } from "@/lib/file-saver";
 
 const DISPLAY_FIELDS = [
-  "externalCode",
-  "senderName",
-  "senderPhone",
-  "senderAddress",
-  "receiverName",
-  "receiverPhone",
-  "receiverAddress",
-  "weight",
-  "pieces",
-  "temperatureLevel",
-  "remark",
+  "externalCode", "senderName", "senderPhone", "senderAddress",
+  "receiverName", "receiverPhone", "receiverAddress",
+  "weight", "pieces", "temperatureLevel", "remark",
 ] as const;
 
 export default function ImportPreview() {
-  const {
-    rows,
-    validationResults,
-    step,
-    setStep,
-    setBatchId,
-    setBatchResult,
-  } = useImport();
-
+  const { rows, validationResults, step, setStep, setBatchId, setBatchResult } = useImport();
   const [submitting, setSubmitting] = useState(false);
 
-  const hasErrors = validationResults.some(
-    (vr) => vr.errors.length > 0
-  );
+  const hasErrors = validationResults.some((vr) => vr.errors.length > 0);
 
   const handleExport = useCallback(() => {
     const headers = DISPLAY_FIELDS.map((f) => FIELD_LABELS[f] || f);
@@ -47,32 +29,22 @@ export default function ImportPreview() {
       }
       return obj;
     });
-
     const buffer = generateExcelBuffer(headers, data);
-    const blob = new Blob([buffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     saveAs(blob, `导入数据预览_${Date.now()}.xlsx`);
   }, [rows]);
 
   const handleSubmit = async () => {
-    if (hasErrors) {
-      alert("请先修正所有错误后再提交");
-      return;
-    }
-
+    if (hasErrors) { alert("请先修正所有错误后再提交"); return; }
     setSubmitting(true);
     setStep("submitting");
-
     try {
       const res = await fetch("/api/import/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rows }),
       });
-
       if (!res.ok) throw new Error("提交失败");
-
       const result = await res.json();
       setBatchId(result.batchId);
       setBatchResult({
@@ -94,48 +66,47 @@ export default function ImportPreview() {
 
   if (step === "submitting") {
     return (
-      <div className="bg-white rounded-lg p-6 border space-y-4">
-        <h2 className="text-lg font-medium">正在提交下单...</h2>
-        <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-          <div className="bg-blue-600 h-full rounded-full" style={{ width: "100%" }} />
+      <div className="el-card" style={{ textAlign: "center", padding: 60 }}>
+        <div style={{ fontSize: 14, color: "var(--el-text-color-regular)", marginBottom: 20, fontWeight: 500 }}>
+          正在提交下单...
         </div>
-        <p className="text-xs text-gray-500 text-right">正在上传数据...</p>
+        <div style={{ maxWidth: 400, margin: "0 auto" }}>
+          <div className="el-progress-bar" style={{ height: 10 }}>
+            <div className="el-progress-bar__inner" style={{ width: "100%", animation: "progress-stripes 1.5s linear infinite", backgroundImage: "linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent)" }} />
+          </div>
+          <style>{`@keyframes progress-stripes { from { background-position: 40px 0; } to { background-position: 0 0; } }`}</style>
+        </div>
+        <p style={{ fontSize: 12, color: "var(--el-text-color-placeholder)", marginTop: 8 }}>正在上传数据，请勿关闭页面...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-lg p-6 border">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium">数据预览与编辑</h2>
-          <div className="flex gap-2">
-            <button
-              className="px-4 py-2 text-sm border rounded hover:bg-gray-50"
-              onClick={handleExport}
-            >
-              导出 Excel
-            </button>
-            <button
-              className="px-4 py-2 text-sm border rounded hover:bg-gray-50"
-              onClick={() => setStep("upload")}
-            >
-              返回重新上传
-            </button>
-            <button
-              className={`px-6 py-2 text-sm rounded text-white ${
-                hasErrors
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-green-600 hover:bg-green-700"
-              }`}
-              disabled={hasErrors || submitting}
-              onClick={handleSubmit}
-            >
-              提交下单
-            </button>
-          </div>
+    <div className="el-card">
+      <div className="el-card__header">
+        <span style={{ fontWeight: 500, fontSize: 16 }}>数据预览与编辑</span>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="el-button el-button--plain el-button--small" onClick={handleExport}>
+            导出 Excel
+          </button>
+          <button className="el-button el-button--plain el-button--small" onClick={() => setStep("upload")}>
+            返回重新上传
+          </button>
+          <button
+            className={`el-button el-button--success el-button--small`}
+            disabled={hasErrors || submitting}
+            onClick={handleSubmit}
+            style={{
+              background: hasErrors ? "var(--el-color-success-light-3)" : undefined,
+              opacity: hasErrors ? 0.5 : undefined,
+              cursor: hasErrors ? "not-allowed" : undefined,
+            }}
+          >
+            提交下单
+          </button>
         </div>
-
+      </div>
+      <div className="el-card__body">
         <ExcelTable />
       </div>
     </div>

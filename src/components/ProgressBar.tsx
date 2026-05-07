@@ -6,24 +6,23 @@ interface ProgressBarProps {
   label?: string;
 }
 
-export default function ProgressBar({
-  current,
-  total,
-  label,
-}: ProgressBarProps) {
+export default function ProgressBar({ current, total, label }: ProgressBarProps) {
   const percent = total > 0 ? Math.round((current / total) * 100) : 0;
 
   return (
-    <div className="w-full space-y-1">
-      {label && <p className="text-sm text-gray-600">{label}</p>}
-      <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-        <div
-          className="bg-blue-600 h-full rounded-full transition-all duration-300 ease-in-out"
-          style={{ width: `${percent}%` }}
-        />
+    <div className="el-progress" style={{ flexDirection: "column", alignItems: "stretch", gap: 4 }}>
+      {label && <p style={{ fontSize: 14, color: "var(--el-text-color-regular)", marginBottom: 4 }}>{label}</p>}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="el-progress-bar">
+          <div
+            className="el-progress-bar__inner"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+        <span className="el-progress__text">{percent}%</span>
       </div>
-      <p className="text-xs text-gray-500 text-right">
-        {percent}% ({current}/{total})
+      <p style={{ fontSize: 12, color: "var(--el-text-color-placeholder)", textAlign: "right" }}>
+        {current} / {total}
       </p>
     </div>
   );
