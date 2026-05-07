@@ -37,7 +37,7 @@ const DEFAULT_TEMPLATES: { name: string; mapping: ColumnMapping }[] = [
     },
   },
   {
-    name: "模板C（分组表头）",
+    name: "模板C（发货/收货分组）",
     mapping: {
       "发件人": "senderName",
       "发件电话": "senderPhone",
@@ -50,6 +50,22 @@ const DEFAULT_TEMPLATES: { name: string; mapping: ColumnMapping }[] = [
       "重量(kg)": "weight",
       "件数": "pieces",
       "温层": "temperatureLevel",
+    },
+  },
+  {
+    name: "模板D（外部订单号/发货/收货）",
+    mapping: {
+      "外部订单号": "externalCode",
+      "发货人": "senderName",
+      "发货电话": "senderPhone",
+      "发货地址": "senderAddress",
+      "收货人": "receiverName",
+      "收货电话": "receiverPhone",
+      "收货地址": "receiverAddress",
+      "重量(kg)": "weight",
+      "数量": "pieces",
+      "温度要求": "temperatureLevel",
+      "附言": "remark",
     },
   },
 ];

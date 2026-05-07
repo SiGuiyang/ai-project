@@ -83,11 +83,21 @@ export const FIELD_LABELS: FieldLabelMap = {
 
 export const FIELD_ALIASES: FieldLabelMap = {
   "发件人": "senderName",
+  "发货人": "senderName",
   "发件电话": "senderPhone",
+  "发货电话": "senderPhone",
   "发件地址": "senderAddress",
+  "发货地址": "senderAddress",
   "收件人": "receiverName",
+  "收货人": "receiverName",
   "收件电话": "receiverPhone",
+  "收货电话": "receiverPhone",
   "收件地址": "receiverAddress",
+  "收货地址": "receiverAddress",
   "外部编码": "externalCode",
+  "外部订单号": "externalCode",
   "重量(kg)": "weight",
+  "数量": "pieces",
+  "温度要求": "temperatureLevel",
+  "附言": "remark",
 };

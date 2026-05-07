@@ -1,7 +1,16 @@
 import * as XLSX from "xlsx";
 import type { ParsedData } from "@/types";
 
-const CATEGORY_ROW_KEYWORDS = ["发件方", "收件方", "货物", "信息"];
+const CATEGORY_KEYWORDS = ["发件方", "收件方", "货物", "信息"];
+
+function normalize(v: string): string {
+  return v
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "")
+    .replace(/[（(][^）)]*[）)]/g, "")
+    .replace(/[（）()]/g, "");
+}
 
 function isRowEmpty(row: (string | undefined)[]): boolean {
   return row.every((v) => !v || String(v).trim() === "");
@@ -14,8 +23,63 @@ function isCategoryRow(row: (string | undefined)[]): boolean {
   }
   if (nonEmpty.length === 0) return false;
   return nonEmpty.some((v) =>
-    CATEGORY_ROW_KEYWORDS.some((kw) => v.includes(kw))
+    CATEGORY_KEYWORDS.some((kw) => v.includes(kw))
   );
+}
+
+const HEADER_PATTERNS: { keywords: string[]; field: string }[] = [
+  // 外部订单号 variants
+  { keywords: ["外部订单号", "外部编码", "客户单号", "orderno", "ordernumber", "order no", "order number"], field: "externalCode" },
+  // 发货人 variants
+  { keywords: ["发货人", "发件人", "发件人姓名", "sendername", "sender name"], field: "senderName" },
+  // 发货电话 variants
+  { keywords: ["发货电话", "发件电话", "发件人电话", "senderphone", "sender phone"], field: "senderPhone" },
+  // 发货地址 variants
+  { keywords: ["发货地址", "发件地址", "发件人地址", "senderaddress", "sender address"], field: "senderAddress" },
+  // 收货人 variants
+  { keywords: ["收货人", "收件人", "收件人姓名", "receivername", "receiver name"], field: "receiverName" },
+  // 收货电话 variants
+  { keywords: ["收货电话", "收件电话", "收件人电话", "receiverphone", "receiver phone"], field: "receiverPhone" },
+  // 收货地址 variants
+  { keywords: ["收货地址", "收件地址", "收件人地址", "receiveraddress", "receiver address"], field: "receiverAddress" },
+  // 重量 variants
+  { keywords: ["重量", "重量kg", "weight"], field: "weight" },
+  // 数量/件数 variants
+  { keywords: ["数量", "件数", "pieces"], field: "pieces" },
+  // 温度要求 variants
+  { keywords: ["温度要求", "温层", "温度", "temperature"], field: "temperatureLevel" },
+  // 备注/附言 variants
+  { keywords: ["附言", "备注", "remark"], field: "remark" },
+];
+
+function scoreRowAsHeader(row: (string | undefined)[]): number {
+  let score = 0;
+  const normalizedCells = row
+    .filter((v): v is string => v !== undefined && v.trim() !== "")
+    .map((v) => normalize(v));
+
+  for (const cell of normalizedCells) {
+    for (const pattern of HEADER_PATTERNS) {
+      if (pattern.keywords.some((kw) => cell === normalize(kw) || cell.includes(normalize(kw)))) {
+        score++;
+        break;
+      }
+    }
+  }
+  return score;
+}
+
+function findHeaderRowIndex(rows: (string | undefined)[][]): number {
+  const MIN_HEADER_SCORE = 3;
+
+  for (let i = 0; i < rows.length; i++) {
+    if (isRowEmpty(rows[i])) continue;
+    const score = scoreRowAsHeader(rows[i]);
+    if (score >= MIN_HEADER_SCORE) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 export function parseExcelFile(
@@ -35,7 +99,6 @@ export function parseExcelFile(
       return { success: false, error: `Sheet "${firstSheetName}" 为空` };
     }
 
-    // Read raw rows as arrays to detect multi-row headers
     const rawRows = XLSX.utils.sheet_to_json<(string | undefined)[]>(sheet, {
       header: 1,
       defval: "",
@@ -45,33 +108,18 @@ export function parseExcelFile(
       return { success: false, error: "文件中没有数据" };
     }
 
-    // Skip leading blank rows
-    let contentStartIndex = 0;
-    while (
-      contentStartIndex < rawRows.length &&
-      isRowEmpty(rawRows[contentStartIndex])
-    ) {
-      contentStartIndex++;
+    // Find the header row by content matching
+    const headerRowIndex = findHeaderRowIndex(rawRows);
+
+    if (headerRowIndex === -1) {
+      return { success: false, error: "无法识别表头行，请确认文件包含正确的列名" };
     }
 
-    if (contentStartIndex >= rawRows.length) {
-      return { success: false, error: "文件中没有数据" };
-    }
+    // If header is preceded by a category row, use the category row info for display
+    const hasCategoryAbove =
+      headerRowIndex > 0 && isCategoryRow(rawRows[headerRowIndex - 1]);
 
-    let headerRowIndex = contentStartIndex;
-    let dataStartIndex = headerRowIndex + 1;
-
-    // Detect if first content row is a category/merged header row
-    if (isCategoryRow(rawRows[headerRowIndex])) {
-      headerRowIndex++;
-      dataStartIndex = headerRowIndex + 1;
-    }
-
-    // If there's no explicit header row beyond categories, check row 0
-    if (headerRowIndex >= rawRows.length) {
-      return { success: false, error: "无法识别表头行" };
-    }
-
+    // Extract headers from the identified header row
     const rawHeaders = rawRows[headerRowIndex]
       .filter((h): h is string => h !== undefined)
       .map((h) => h.trim());
@@ -80,6 +128,8 @@ export function parseExcelFile(
       return { success: false, error: "表头行为空" };
     }
 
+    // Data starts after the header row (and after category row if present)
+    const dataStartIndex = headerRowIndex + 1;
     const dataRows = rawRows.slice(dataStartIndex).filter(
       (row) => row && row.some((v) => v && v.trim() !== "")
     );
@@ -88,7 +138,6 @@ export function parseExcelFile(
       return { success: false, error: "除表头外没有数据行" };
     }
 
-    // Convert data rows to Record<string, string>
     const parsedRows: Record<string, string>[] = dataRows.map((row) => {
       const record: Record<string, string> = {};
       rawHeaders.forEach((header, idx) => {
