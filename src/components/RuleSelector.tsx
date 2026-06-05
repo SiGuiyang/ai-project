@@ -24,7 +24,6 @@ export default function RuleSelector() {
   const [manualType, setManualType] = useState("excel");
   const [manualConfig, setManualConfig] = useState("");
 
-  const [aiFile, setAiFile] = useState<File | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
@@ -61,20 +60,31 @@ export default function RuleSelector() {
     setSelectedRule(config);
   };
 
-  const handleAiUpload = useCallback(async () => {
-    if (!aiFile || !pd) return;
+  const handleAiAnalysis = useCallback(async () => {
+    if (!pd) return;
     setAiLoading(true);
     setAiError(null);
     try {
-      const text = await aiFile.text();
+      const { headers, rows } = pd;
+      const sampleRows = rows.slice(0, 20);
+      const textContent = [
+        `列头: ${headers.join("\t")}`,
+        ...sampleRows.map((r) => headers.map((h) => r[h] ?? "").join("\t")),
+        ...(rows.length > 20 ? [`\n... 共 ${rows.length} 行数据`] : []),
+      ].join("\n");
+
       const res = await fetch("/api/ai/generate-rule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileName: aiFile.name, fileType: "excel", content: text }),
+        body: JSON.stringify({
+          fileName: "parsed-data.xlsx",
+          fileType: "excel",
+          content: textContent,
+        }),
       });
       const data = await res.json();
       if (data.error) {
-        setAiError(data.error);
+        setAiError(data.raw ? `AI 返回格式异常: ${data.raw.slice(0, 200)}` : data.error);
         return;
       }
       const rule = data.config as ParseRuleConfig;
@@ -85,7 +95,7 @@ export default function RuleSelector() {
     } finally {
       setAiLoading(false);
     }
-  }, [aiFile, pd, setAiGeneratedRule]);
+  }, [pd, setAiGeneratedRule]);
 
   const handleNext = () => {
     if (mode === "select") {
@@ -167,12 +177,25 @@ export default function RuleSelector() {
 
         {mode === "ai" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ border: "1px dashed var(--el-border-color)", borderRadius: 8, padding: 20, textAlign: "center" }}>
-              <input type="file" accept=".xlsx,.xls,.csv,.txt" onChange={(e) => { const f = e.target.files?.[0]; if (f) setAiFile(f); }} />
-              {aiFile && <p style={{ fontSize: 13, marginTop: 8, color: "var(--el-text-color-secondary)" }}>{aiFile.name}</p>}
-            </div>
-            <button className="el-button el-button--primary el-button--small" onClick={handleAiUpload} disabled={!aiFile || aiLoading}>
-              {aiLoading ? "AI 分析中..." : "AI 分析"}
+            {pd ? (
+              <div style={{ background: "var(--el-color-info-light-9)", borderRadius: 6, padding: 12, fontSize: 13 }}>
+                <p>已解析数据：<strong>{pd.headers.length}</strong> 列，<strong>{pd.rows.length}</strong> 行</p>
+                <p style={{ color: "var(--el-text-color-secondary)", marginTop: 4, fontSize: 12 }}>
+                  列头：{pd.headers.join("、")}
+                </p>
+                {pd.rows.length > 0 && (
+                  <pre style={{ fontSize: 11, marginTop: 8, whiteSpace: "pre-wrap", background: "var(--el-color-white)", padding: 8, borderRadius: 4, maxHeight: 120, overflow: "auto" }}>
+                    {pd.headers.map((h) => h).join("\t")}
+                    {"\n"}
+                    {pd.rows.slice(0, 5).map((r, i) => pd.headers.map((h) => r[h] ?? "").join("\t")).join("\n")}
+                  </pre>
+                )}
+              </div>
+            ) : (
+              <div className="el-alert el-alert--warning">请先在导入页面选择文件</div>
+            )}
+            <button className="el-button el-button--primary el-button--small" onClick={handleAiAnalysis} disabled={!pd || aiLoading}>
+              {aiLoading ? "AI 分析中..." : "AI 分析并生成规则"}
             </button>
             {aiError && <div className="el-alert el-alert--error">{aiError}</div>}
             {aiGeneratedRule && (
@@ -186,7 +209,7 @@ export default function RuleSelector() {
 
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
           <button className="el-button el-button--plain el-button--small" onClick={() => setStep("upload")}>返回</button>
-          <button className="el-button el-button--success el-button--small" onClick={handleNext} disabled={mode === "select" && !selectedRule}>
+          <button className="el-button el-button--success el-button--small" onClick={handleNext} disabled={(mode === "select" && !selectedRule) || (mode === "ai" && !aiGeneratedRule)}>
             下一步
           </button>
         </div>
