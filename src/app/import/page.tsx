@@ -2,19 +2,19 @@
 
 import { ImportProvider, useImport } from "@/store/import-context";
 import FileUploader from "@/components/FileUploader";
-import TemplateMatcher from "@/components/TemplateMatcher";
+import RuleSelector from "@/components/RuleSelector";
 import ImportPreview from "@/components/ImportPreview";
 import ImportResult from "@/components/ImportResult";
 
 const STEPS = [
   { key: "upload", label: "上传文件", icon: "1" },
-  { key: "mapping", label: "列映射", icon: "2" },
+  { key: "rule", label: "解析规则", icon: "2" },
   { key: "preview", label: "预览数据", icon: "3" },
   { key: "submitting", label: "提交中", icon: "4" },
   { key: "result", label: "完成", icon: "5" },
 ] as const;
 
-const STEP_ORDER = ["upload", "mapping", "preview", "submitting", "result"];
+const STEP_ORDER = ["upload", "rule", "preview", "submitting", "result"];
 
 function StepIndicator({ current }: { current: string }) {
   const currentIdx = STEP_ORDER.indexOf(current);
@@ -41,11 +41,6 @@ function StepIndicator({ current }: { current: string }) {
   );
 }
 
-const STEP_TITLES: Record<string, string> = {
-  upload: "上传 Excel 文件",
-  mapping: "列映射配置",
-};
-
 function ImportFlow() {
   const { step } = useImport();
 
@@ -62,17 +57,8 @@ function ImportFlow() {
             </div>
           </div>
         );
-      case "mapping":
-        return (
-          <div className="el-card">
-            <div className="el-card__header">
-              <span style={{ fontWeight: 500, fontSize: 15 }}>列映射配置</span>
-            </div>
-            <div className="el-card__body">
-              <TemplateMatcher />
-            </div>
-          </div>
-        );
+      case "rule":
+        return <RuleSelector />;
       case "preview":
       case "submitting":
         return <ImportPreview />;

@@ -101,3 +101,61 @@ export const FIELD_ALIASES: FieldLabelMap = {
   "温度要求": "temperatureLevel",
   "附言": "remark",
 };
+
+// ---- V2 Import types ----
+
+export interface OrderItemRow {
+  skuCode: string;
+  skuName: string;
+  quantity: number;
+  spec?: string;
+}
+
+export interface ImportOrderRow {
+  id: string;
+  externalCode?: string;
+  storeName?: string;
+  receiverName?: string;
+  receiverPhone?: string;
+  receiverAddress?: string;
+  remark?: string;
+  items: OrderItemRow[];
+}
+
+export type AggFunction = "sum" | "first" | "concat";
+
+export interface PostProcessor {
+  type: "aggregate" | "transpose" | "extractTail" | "cardSplit" | "cellSplit" | "multiSheet";
+  config?: Record<string, unknown>;
+}
+
+export interface ExtractRule {
+  type: "tail" | "header";
+  fields: { label: string; target: string }[];
+}
+
+export interface ParseRuleConfig {
+  name?: string;
+  fileType: "excel" | "word" | "pdf";
+  sheetIndex?: number;
+  headerRow?: number;
+  dataStartRow?: number;
+  skipRows?: number[];
+  columnMappings: Record<string, string>;
+  groupBy?: string;
+  postProcessors?: PostProcessor[];
+  extractors?: ExtractRule[];
+}
+
+export const V2_FIELD_LABELS: Record<string, string> = {
+  externalCode: "外部编码",
+  storeName: "收货门店",
+  receiverName: "收件人姓名",
+  receiverPhone: "收件人电话",
+  receiverAddress: "收件人地址",
+  skuCode: "SKU物品编码",
+  skuName: "SKU物品名称",
+  quantity: "SKU发货数量",
+  spec: "SKU规格型号",
+  remark: "备注",
+};

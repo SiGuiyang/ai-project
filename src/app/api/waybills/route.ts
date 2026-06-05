@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryWaybills } from "@/lib/db";
+import { queryOrders } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get("startDate") || undefined;
     const endDate = searchParams.get("endDate") || undefined;
 
-    const result = await queryWaybills({
+    const result = await queryOrders({
       page,
       pageSize,
       externalCode,
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (e) {
-    console.error("Waybill query error:", e);
+    console.error("Order query error:", e);
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "查询失败" },
       { status: 500 }

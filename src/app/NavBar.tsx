@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   { href: "/import", label: "导入" },
+  { href: "/import/rules", label: "解析规则" },
   { href: "/import/history", label: "运单列表" },
 ];
 

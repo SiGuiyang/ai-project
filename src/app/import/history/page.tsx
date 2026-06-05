@@ -1,23 +1,26 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import type { ImportOrderRow } from "@/types";
 
-interface WaybillRecord {
+interface OrderRecord {
   id: string;
   batchId: string;
   externalCode: string | null;
-  senderName: string;
-  senderPhone: string;
-  receiverName: string;
-  receiverPhone: string;
-  weight: number;
-  pieces: number;
-  temperatureLevel: string;
+  storeName: string | null;
+  receiverName: string | null;
+  receiverPhone: string | null;
   createdAt: string;
+  items: Array<{
+    skuCode: string;
+    skuName: string;
+    quantity: number;
+    spec: string | null;
+  }>;
 }
 
 interface PageData {
-  data: WaybillRecord[];
+  data: OrderRecord[];
   total: number;
   page: number;
   pageSize: number;
@@ -53,13 +56,13 @@ export default function HistoryPage() {
   }, [page, externalCode, receiverName, startDate, endDate, pageSize]);
 
   useEffect(() => {
-    fetchData(); // eslint-disable-line
+    fetchData();
   }, [fetchData]);
 
   return (
     <div className="el-card">
       <div className="el-card__header">
-        <span style={{ fontWeight: 500, fontSize: 16 }}>已导入运单记录</span>
+        <span style={{ fontWeight: 500, fontSize: 16 }}>已导入订单记录</span>
         <span style={{ fontSize: 13, color: "var(--el-text-color-secondary)" }}>
           {data ? `共 ${data.total} 条` : ""}
         </span>
@@ -80,7 +83,7 @@ export default function HistoryPage() {
           <div className="el-input" style={{ flex: 1, minWidth: 160, maxWidth: 220 }}>
             <input
               className="el-input__inner"
-              placeholder="搜索客户单号"
+              placeholder="搜索外部编码"
               value={externalCode}
               onChange={(e) => { setExternalCode(e.target.value); setPage(1); }}
             />
@@ -163,33 +166,36 @@ export default function HistoryPage() {
               <table className="el-table" style={{ minWidth: 1000 }}>
                 <thead>
                   <tr>
-                    <th className="el-table__header">客户单号</th>
-                    <th className="el-table__header">发件人</th>
-                    <th className="el-table__header">发件人电话</th>
+                    <th className="el-table__header">外部编码</th>
+                    <th className="el-table__header">收货门店</th>
                     <th className="el-table__header">收件人</th>
                     <th className="el-table__header">收件人电话</th>
-                    <th className="el-table__header">重量</th>
-                    <th className="el-table__header">件数</th>
-                    <th className="el-table__header">温层</th>
+                    <th className="el-table__header">SKU编码</th>
+                    <th className="el-table__header">SKU名称</th>
+                    <th className="el-table__header">数量</th>
+                    <th className="el-table__header">规格</th>
                     <th className="el-table__header">提交时间</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.data.map((row) => (
-                    <tr key={row.id}>
-                      <td>{row.externalCode || <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
-                      <td>{row.senderName}</td>
-                      <td>{row.senderPhone}</td>
-                      <td>{row.receiverName}</td>
-                      <td>{row.receiverPhone}</td>
-                      <td>{row.weight}</td>
-                      <td>{row.pieces}</td>
-                      <td><span className={`el-tag el-tag--${row.temperatureLevel === "常温" ? "success" : row.temperatureLevel === "冷藏" ? "primary" : "warning"}`}>{row.temperatureLevel}</span></td>
-                      <td style={{ whiteSpace: "nowrap", color: "var(--el-text-color-secondary)", fontSize: 13 }}>
-                        {new Date(row.createdAt).toLocaleString("zh-CN")}
-                      </td>
-                    </tr>
-                  ))}
+                  {data.data.map((row) => {
+                    const firstItem = row.items?.[0];
+                    return (
+                      <tr key={row.id}>
+                        <td>{row.externalCode || <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
+                        <td>{row.storeName || <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
+                        <td>{row.receiverName || <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
+                        <td>{row.receiverPhone || <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
+                        <td>{firstItem?.skuCode || <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
+                        <td>{firstItem?.skuName || <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
+                        <td>{firstItem?.quantity ?? <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
+                        <td>{firstItem?.spec || <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
+                        <td style={{ whiteSpace: "nowrap", color: "var(--el-text-color-secondary)", fontSize: 13 }}>
+                          {new Date(row.createdAt).toLocaleString("zh-CN")}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

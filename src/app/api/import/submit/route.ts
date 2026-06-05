@@ -1,50 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createBatch, saveWaybills, getAllExternalCodes, updateBatchStatus, type WaybillInput } from "@/lib/db";
-import { validateRow, findDuplicates } from "@/lib/validator";
-import type { WaybillRow } from "@/types";
+import { createBatch, saveOrders, prisma, type SaveOrdersInput } from "@/lib/db";
+import { validateOrderRow } from "@/lib/validator";
+import type { ImportOrderRow } from "@/types";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { rows, batchId: existingBatchId }: { rows: WaybillRow[]; batchId?: string } = body;
+    const { orders, batchId: existingBatchId }: { orders: ImportOrderRow[]; batchId?: string } = body;
 
-    if (!rows || !Array.isArray(rows) || rows.length === 0) {
+    if (!orders || !Array.isArray(orders) || orders.length === 0) {
       return NextResponse.json({ error: "没有可提交的数据" }, { status: 400 });
     }
 
-    const existingCodes = await getAllExternalCodes();
-
-    for (let i = 0; i < rows.length; i++) {
-      const errors = validateRow(rows[i], i);
+    for (let i = 0; i < orders.length; i++) {
+      const errors = validateOrderRow(orders[i], i);
       if (errors.length > 0) {
         return NextResponse.json({ error: `第 ${i + 1} 行存在校验错误`, details: errors }, { status: 400 });
       }
     }
 
-    const duplicates = findDuplicates(rows, existingCodes);
-    if (duplicates.length > 0) {
-      return NextResponse.json({ error: "存在重复的客户单号", details: duplicates }, { status: 409 });
-    }
-
     const batchId = existingBatchId || (await createBatch());
 
-    const inputs: WaybillInput[] = rows.map((row) => ({
-      batchId,
-      externalCode: row.externalCode || undefined,
-      senderName: row.senderName,
-      senderPhone: row.senderPhone,
-      senderAddress: row.senderAddress,
-      receiverName: row.receiverName,
-      receiverPhone: row.receiverPhone,
-      receiverAddress: row.receiverAddress,
-      weight: Number(row.weight),
-      pieces: Number(row.pieces),
-      temperatureLevel: row.temperatureLevel,
-      remark: row.remark || undefined,
+    const inputs: SaveOrdersInput[] = orders.map((order) => ({
+      externalCode: order.externalCode || undefined,
+      storeName: order.storeName || undefined,
+      receiverName: order.receiverName || undefined,
+      receiverPhone: order.receiverPhone || undefined,
+      receiverAddress: order.receiverAddress || undefined,
+      remark: order.remark || undefined,
+      items: order.items.map((item) => ({
+        skuCode: item.skuCode,
+        skuName: item.skuName,
+        quantity: item.quantity,
+        spec: item.spec || undefined,
+      })),
     }));
 
-    const result = await saveWaybills(inputs, existingBatchId ? "append" : "new");
-    result.batchId = batchId;
+    const result = await saveOrders(batchId, inputs, existingBatchId ? "append" : "new");
 
     return NextResponse.json(result);
   } catch (e) {
@@ -62,7 +54,10 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "batchId 是必需的" }, { status: 400 });
     }
 
-    await updateBatchStatus(batchId, status);
+    await prisma.importBatch.update({
+      where: { id: batchId },
+      data: { status },
+    });
     return NextResponse.json({ success: true });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "更新失败" }, { status: 500 });

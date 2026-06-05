@@ -1,34 +1,43 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, createElement, type CSSProperties } from "react";
+import { List } from "react-window";
 import { useImport } from "@/store/import-context";
 import CellEditor from "./CellEditor";
-import { FIELD_LABELS } from "@/types";
-import { getFieldValue } from "@/lib/helpers";
+import { V2_FIELD_LABELS } from "@/types";
 
 const DISPLAY_FIELDS = [
   "externalCode",
-  "senderName",
-  "senderPhone",
-  "senderAddress",
+  "storeName",
   "receiverName",
   "receiverPhone",
   "receiverAddress",
-  "weight",
-  "pieces",
-  "temperatureLevel",
   "remark",
 ] as const;
 
 const EDITABLE_FIELDS = new Set([
-  "senderName", "senderPhone", "senderAddress",
-  "receiverName", "receiverPhone", "receiverAddress",
-  "weight", "pieces", "temperatureLevel",
-  "externalCode", "remark",
+  "storeName",
+  "receiverName",
+  "receiverPhone",
+  "receiverAddress",
+  "externalCode",
+  "remark",
 ]);
 
+const COL_WIDTHS: Record<string, string> = {
+  checkbox: "40px",
+  index: "40px",
+  externalCode: "130px",
+  storeName: "130px",
+  receiverName: "130px",
+  receiverPhone: "130px",
+  receiverAddress: "160px",
+  remark: "130px",
+  skuInfo: "80px",
+};
+
 export default function ExcelTable() {
-  const { rows, validationResults, updateRow, addRow, deleteRows } = useImport();
+  const { orders, validationResults, updateRow, addRow, deleteRows } = useImport();
 
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [editingCell, setEditingCell] = useState<{ row: number; field: string } | null>(null);
@@ -85,11 +94,69 @@ export default function ExcelTable() {
   const totalErrors = validationResults.reduce((s, vr) => s + vr.errors.length, 0);
   const totalDuplicates = validationResults.reduce((s, vr) => s + vr.duplicates.length, 0);
 
+  const ROW_HEIGHT = 36;
+  const containerHeight = Math.min(orders.length * ROW_HEIGHT + 8, 500);
+
+  const RowComponent: (props: { index: number; style: CSSProperties }) => ReturnType<typeof createElement> = useCallback(
+    ({ index, style }) => {
+      const order = orders[index];
+      const rowErrors = errorMap.get(index);
+      const rowDuplicates = duplicateMap.get(index);
+      const hasError = !!rowErrors?.length;
+      const hasDup = !!rowDuplicates?.length;
+      const bg = hasError ? "var(--el-color-danger-light-9)" : hasDup ? "var(--el-color-warning-light-9)" : undefined;
+
+      return (
+        <div style={{ ...style, display: "flex", alignItems: "center", background: bg, borderBottom: "1px solid var(--el-border-color-light)", boxSizing: "border-box" }}>
+          <div style={{ width: COL_WIDTHS.checkbox, textAlign: "center", flexShrink: 0 }}>
+            <input type="checkbox" className="el-checkbox" checked={selectedRows.has(index)} onChange={() => toggleRow(index)} />
+          </div>
+          <div style={{ width: COL_WIDTHS.index, textAlign: "center", color: "var(--el-text-color-placeholder)", flexShrink: 0 }}>
+            {index + 1}
+          </div>
+          {DISPLAY_FIELDS.map((field) => {
+            const cellKey = `${index}-${field}`;
+            const cellErr = cellErrors.get(cellKey);
+            const dup = duplicateMap.get(index)?.find((d) => d.field === field);
+            const value = (order as unknown as Record<string, string | number | undefined>)[field];
+            const isEditing = editingCell?.row === index && editingCell?.field === field;
+            const cellBg = cellErr ? "var(--el-color-danger-light-9)" : dup ? "var(--el-color-warning-light-9)" : undefined;
+
+            return (
+              <div
+                key={field}
+                style={{ width: COL_WIDTHS[field] || "130px", padding: "4px 8px", flexShrink: 0, background: cellBg, position: "relative", boxSizing: "border-box" }}
+                title={cellErr ? cellErr.map((e) => e.message).join("; ") : dup ? `重复：${dup.value}` : undefined}
+              >
+                {isEditing ? (
+                  <CellEditor field={field} value={value} onSave={(v) => { handleCellSave(index, field, v); }} onCancel={() => setEditingCell(null)} />
+                ) : (
+                  <div
+                    style={{ minHeight: 24, padding: "0 4px", cursor: EDITABLE_FIELDS.has(field) ? "pointer" : "default", borderRadius: "var(--el-border-radius-small)", display: "flex", alignItems: "center", lineHeight: "24px", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                    onMouseEnter={(e) => { if (EDITABLE_FIELDS.has(field)) (e.currentTarget as HTMLElement).style.background = "var(--el-color-primary-light-9)"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                    onClick={() => { if (EDITABLE_FIELDS.has(field)) setEditingCell({ row: index, field }); }}
+                  >
+                    {String(value ?? "")}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <div style={{ width: COL_WIDTHS.skuInfo, textAlign: "center", fontSize: 12, color: "var(--el-text-color-secondary)", flexShrink: 0, padding: "0 8px", boxSizing: "border-box" }}>
+            {(order.items?.length || 0) > 0 ? `${order.items!.length} 个` : "-"}
+          </div>
+        </div>
+      );
+    },
+    [orders, errorMap, duplicateMap, cellErrors, editingCell, selectedRows]
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 14 }}>
         <span style={{ color: "var(--el-text-color-secondary)" }}>
-          共 <strong style={{ color: "var(--el-text-color-primary)" }}>{rows.length}</strong> 行
+          共 <strong style={{ color: "var(--el-text-color-primary)" }}>{orders.length}</strong> 行
         </span>
         {totalErrors > 0 && (
           <span className="el-tag el-tag--danger">错误 {totalErrors} 处</span>
@@ -111,96 +178,29 @@ export default function ExcelTable() {
         </button>
       </div>
 
-      <div style={{ overflow: "auto", border: "1px solid var(--el-border-color-light)", borderRadius: "var(--el-border-radius-base)", maxHeight: 560 }}>
-        <table className="el-table" style={{ minWidth: 1200 }}>
-          <thead>
-            <tr>
-              <th className="el-table__header" style={{ width: 40, textAlign: "center", position: "sticky", left: 0, zIndex: 2, background: "var(--el-bg-color)" }}>
-                <input type="checkbox" className="el-checkbox" checked={selectedRows.size === rows.length && rows.length > 0} onChange={(e) => { if (e.target.checked) setSelectedRows(new Set(rows.map((_, i) => i))); else setSelectedRows(new Set()); }} />
-              </th>
-              <th className="el-table__header" style={{ width: 40, textAlign: "center", position: "sticky", left: 40, zIndex: 2, background: "var(--el-bg-color)" }}>
-                #
-              </th>
-              {DISPLAY_FIELDS.map((field) => (
-                <th key={field} className="el-table__header" style={{ minWidth: 130, whiteSpace: "nowrap" }}>
-                  {FIELD_LABELS[field] || field}
-                  {(field === "externalCode" || field === "remark") && (
-                    <span style={{ color: "var(--el-text-color-placeholder)", fontWeight: 400, marginLeft: 2 }}>（选填）</span>
-                  )}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, rowIndex) => {
-              const rowErrors = errorMap.get(rowIndex);
-              const rowDuplicates = duplicateMap.get(rowIndex);
-              const hasError = !!rowErrors?.length;
-              const hasDup = !!rowDuplicates?.length;
-
-              return (
-                <tr key={row.id}>
-                  <td style={{ textAlign: "center", position: "sticky", left: 0, zIndex: 1, background: hasError ? "var(--el-color-danger-light-9)" : hasDup ? "var(--el-color-warning-light-9)" : undefined }}>
-                    <input type="checkbox" className="el-checkbox" checked={selectedRows.has(rowIndex)} onChange={() => toggleRow(rowIndex)} />
-                  </td>
-                  <td style={{ textAlign: "center", color: "var(--el-text-color-placeholder)", position: "sticky", left: 40, zIndex: 1, background: hasError ? "var(--el-color-danger-light-9)" : hasDup ? "var(--el-color-warning-light-9)" : undefined }}>
-                    {rowIndex + 1}
-                  </td>
-                  {DISPLAY_FIELDS.map((field) => {
-                    const cellKey = `${rowIndex}-${field}`;
-                    const cellErr = cellErrors.get(cellKey);
-                    const dup = duplicateMap.get(rowIndex)?.find((d) => d.field === field);
-                    const value = getFieldValue(row, field);
-                    const isEditing = editingCell?.row === rowIndex && editingCell?.field === field;
-
-                    return (
-                      <td
-                        key={field}
-                        style={{
-                          background: cellErr ? "var(--el-color-danger-light-9)" : dup ? "var(--el-color-warning-light-9)" : hasError ? undefined : undefined,
-                          padding: "4px 8px",
-                          position: "relative",
-                        }}
-                        title={cellErr ? cellErr.map((e) => e.message).join("; ") : dup ? `与第 ${dup.duplicateWithRow + 1} 行重复：${dup.value}` : undefined}
-                      >
-                        {isEditing ? (
-                          <CellEditor field={field} value={value} onSave={(v) => handleCellSave(rowIndex, field, v)} onCancel={() => setEditingCell(null)} />
-                        ) : (
-                          <div
-                            style={{
-                              minHeight: 24,
-                              padding: "0 4px",
-                              cursor: EDITABLE_FIELDS.has(field) ? "pointer" : "default",
-                              borderRadius: "var(--el-border-radius-small)",
-                              display: "flex",
-                              alignItems: "center",
-                              lineHeight: "24px",
-                            }}
-                            onMouseEnter={(e) => {
-                              if (EDITABLE_FIELDS.has(field)) (e.currentTarget as HTMLElement).style.background = "var(--el-color-primary-light-9)";
-                            }}
-                            onMouseLeave={(e) => {
-                              (e.currentTarget as HTMLElement).style.background = "transparent";
-                            }}
-                            onClick={() => {
-                              if (EDITABLE_FIELDS.has(field)) setEditingCell({ row: rowIndex, field });
-                            }}
-                          >
-                            {field === "temperatureLevel" && !value ? (
-                              <span style={{ color: "var(--el-text-color-placeholder)" }}>请选择</span>
-                            ) : (
-                              String(value ?? "")
-                            )}
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div style={{ overflow: "hidden", border: "1px solid var(--el-border-color-light)", borderRadius: "var(--el-border-radius-base)" }}>
+        <div style={{ display: "flex", background: "var(--el-bg-color)", fontWeight: 500, fontSize: 13, borderBottom: "1px solid var(--el-border-color-light)", position: "sticky", top: 0, zIndex: 2 }}>
+          <div style={{ width: COL_WIDTHS.checkbox, textAlign: "center", padding: "8px 0", flexShrink: 0 }}>
+            <input type="checkbox" className="el-checkbox" checked={selectedRows.size === orders.length && orders.length > 0} onChange={(e) => { if (e.target.checked) setSelectedRows(new Set(orders.map((_, i) => i))); else setSelectedRows(new Set()); }} />
+          </div>
+          <div style={{ width: COL_WIDTHS.index, textAlign: "center", padding: "8px 0", color: "var(--el-text-color-placeholder)", flexShrink: 0 }}>#</div>
+          {DISPLAY_FIELDS.map((field) => (
+            <div key={field} style={{ width: COL_WIDTHS[field] || "130px", padding: "8px", flexShrink: 0, whiteSpace: "nowrap", boxSizing: "border-box" }}>
+              {V2_FIELD_LABELS[field] || field}
+              {(field === "externalCode" || field === "remark") && (
+                <span style={{ color: "var(--el-text-color-placeholder)", fontWeight: 400, marginLeft: 2, fontSize: 12 }}>（选填）</span>
+              )}
+            </div>
+          ))}
+          <div style={{ width: COL_WIDTHS.skuInfo, textAlign: "center", padding: "8px 0", flexShrink: 0 }}>SKU</div>
+        </div>
+        {createElement(List, {
+          rowCount: orders.length,
+          rowHeight: ROW_HEIGHT,
+          rowComponent: RowComponent,
+          rowProps: {} as any,
+          style: { height: containerHeight, width: "100%" } as CSSProperties,
+        })}
       </div>
 
       {validationResults.length > 0 && (

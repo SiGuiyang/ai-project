@@ -1,4 +1,4 @@
-import type { WaybillRow, RowError, DuplicateInfo, ValidationResult } from "@/types";
+import type { WaybillRow, ImportOrderRow, RowError, DuplicateInfo, ValidationResult } from "@/types";
 import { REQUIRED_FIELDS, TEMPERATURE_LEVELS, FIELD_LABELS } from "@/types";
 import { getFieldValue } from "@/lib/helpers";
 
@@ -72,6 +72,51 @@ export function validateRow(
   return errors;
 }
 
+export function validateOrderRow(
+  order: ImportOrderRow,
+  rowIndex: number
+): RowError[] {
+  const errors: RowError[] = [];
+
+  const hasStore = order.storeName && String(order.storeName).trim() !== "";
+  const hasReceiver = order.receiverName && String(order.receiverName).trim() !== "" &&
+    order.receiverPhone && String(order.receiverPhone).trim() !== "" &&
+    order.receiverAddress && String(order.receiverAddress).trim() !== "";
+
+  if (!hasStore && !hasReceiver) {
+    errors.push({
+      rowIndex,
+      field: "storeName",
+      message: "收货门店和收件人信息（姓名+电话+地址）至少填一项",
+    });
+  }
+  if (order.receiverPhone && !PHONE_REGEX.test(String(order.receiverPhone).trim())) {
+    errors.push({
+      rowIndex,
+      field: "receiverPhone",
+      message: "收件人电话格式错误，需为11位手机号",
+    });
+  }
+
+  if (order.items && order.items.length > 0) {
+    order.items.forEach((item, itemIdx) => {
+      if (!item.skuCode || String(item.skuCode).trim() === "") {
+        errors.push({ rowIndex, field: `items.${itemIdx}.skuCode`, message: `第 ${itemIdx + 1} 个SKU编码不能为空` });
+      }
+      if (!item.skuName || String(item.skuName).trim() === "") {
+        errors.push({ rowIndex, field: `items.${itemIdx}.skuName`, message: `第 ${itemIdx + 1} 个SKU名称不能为空` });
+      }
+      if (!item.quantity || Number(item.quantity) <= 0) {
+        errors.push({ rowIndex, field: `items.${itemIdx}.quantity`, message: `第 ${itemIdx + 1} 个SKU数量必须为正数` });
+      }
+    });
+  } else {
+    errors.push({ rowIndex, field: "items", message: "至少需要一个SKU物品" });
+  }
+
+  return errors;
+}
+
 export function findDuplicates(
   rows: WaybillRow[],
   existingExternalCodes: Set<string>
@@ -127,6 +172,24 @@ export function validateAll(
       rowIndex: i,
       errors,
       duplicates: rowDuplicates,
+    });
+  }
+
+  return results;
+}
+
+export function validateAllOrders(
+  orders: ImportOrderRow[],
+  existingExternalCodes?: Set<string>
+): ValidationResult[] {
+  const results: ValidationResult[] = [];
+
+  for (let i = 0; i < orders.length; i++) {
+    const errors = validateOrderRow(orders[i], i);
+    results.push({
+      rowIndex: i,
+      errors,
+      duplicates: [],
     });
   }
 

@@ -182,3 +182,158 @@ export async function upsertTemplateMapping(
     create: { templateHash, columnMappings: JSON.stringify(columnMappings) },
   });
 }
+
+// ---- ParseRule CRUD ----
+
+export async function getAllRules(): Promise<import("@prisma/client").ParseRule[]> {
+  return prisma.parseRule.findMany({ orderBy: { createdAt: "desc" } });
+}
+
+export async function getRule(id: string): Promise<import("@prisma/client").ParseRule | null> {
+  return prisma.parseRule.findUnique({ where: { id } });
+}
+
+export async function createRule(data: {
+  name: string;
+  fileType: string;
+  config: string;
+}): Promise<import("@prisma/client").ParseRule> {
+  return prisma.parseRule.create({ data });
+}
+
+export async function updateRule(
+  id: string,
+  data: { name?: string; fileType?: string; config?: string }
+): Promise<import("@prisma/client").ParseRule> {
+  return prisma.parseRule.update({ where: { id }, data });
+}
+
+export async function deleteRule(id: string): Promise<void> {
+  await prisma.parseRule.delete({ where: { id } });
+}
+
+// ---- ImportOrder + OrderItem CRUD ----
+
+export interface SaveOrdersInput {
+  externalCode?: string;
+  storeName?: string;
+  receiverName?: string;
+  receiverPhone?: string;
+  receiverAddress?: string;
+  remark?: string;
+  items: { skuCode: string; skuName: string; quantity: number; spec?: string }[];
+}
+
+export async function saveOrders(
+  batchId: string,
+  inputs: SaveOrdersInput[],
+  mode: "new" | "append" = "new"
+): Promise<BatchResult> {
+  if (inputs.length === 0) {
+    return { batchId: "", successCount: 0, failCount: 0, failedRows: [] };
+  }
+
+  if (mode === "new") {
+    await prisma.importBatch.update({
+      where: { id: batchId },
+      data: { status: "processing", totalCount: inputs.length },
+    });
+  }
+
+  let successCount = 0;
+  let failCount = 0;
+  const failedRows: { rowIndex: number; error: string }[] = [];
+
+  for (let i = 0; i < inputs.length; i++) {
+    try {
+      const input = inputs[i];
+      await prisma.importOrder.create({
+        data: {
+          batchId,
+          externalCode: input.externalCode || null,
+          storeName: input.storeName || null,
+          receiverName: input.receiverName || null,
+          receiverPhone: input.receiverPhone || null,
+          receiverAddress: input.receiverAddress || null,
+          remark: input.remark || null,
+          items: {
+            create: input.items.map((item) => ({
+              skuCode: item.skuCode,
+              skuName: item.skuName,
+              quantity: item.quantity,
+              spec: item.spec || null,
+            })),
+          },
+        },
+      });
+      successCount++;
+    } catch (e) {
+      failCount++;
+      failedRows.push({ rowIndex: i, error: e instanceof Error ? e.message : "保存失败" });
+    }
+  }
+
+  if (mode === "new") {
+    await prisma.importBatch.update({
+      where: { id: batchId },
+      data: { status: "completed", successCount, failCount },
+    });
+  } else {
+    await prisma.importBatch.update({
+      where: { id: batchId },
+      data: {
+        totalCount: { increment: inputs.length },
+        successCount: { increment: successCount },
+        failCount: { increment: failCount },
+      },
+    });
+  }
+
+  return { batchId, successCount, failCount, failedRows };
+}
+
+export interface OrderQuery {
+  page: number;
+  pageSize: number;
+  externalCode?: string;
+  receiverName?: string;
+  batchId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export async function queryOrders(
+  query: OrderQuery
+): Promise<PaginatedResult<import("@prisma/client").ImportOrder>> {
+  const { page, pageSize, externalCode, receiverName, batchId, startDate, endDate } = query;
+  const where: Record<string, unknown> = {};
+
+  if (externalCode) where.externalCode = { contains: externalCode };
+  if (receiverName) where.receiverName = { contains: receiverName };
+  if (batchId) where.batchId = batchId;
+  if (startDate || endDate) {
+    const createdAt: Record<string, Date> = {};
+    if (startDate) createdAt.gte = new Date(startDate);
+    if (endDate) createdAt.lte = new Date(endDate + "T23:59:59.999Z");
+    where.createdAt = createdAt;
+  }
+
+  const [data, total] = await Promise.all([
+    prisma.importOrder.findMany({
+      where,
+      include: { items: true },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.importOrder.count({ where }),
+  ]);
+
+  return {
+    data,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.ceil(total / pageSize),
+  };
+}

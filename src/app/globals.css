@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --el-color-primary: #409eff;
-  --el-color-primary-light-3: #79bbff;
-  --el-color-primary-light-5: #a0cfff;
-  --el-color-primary-light-7: #c6e2ff;
-  --el-color-primary-light-8: #d9ecff;
-  --el-color-primary-light-9: #ecf5ff;
-  --el-color-primary-dark-2: #337ecc;
+  --el-color-primary: #0fc6c2;
+  --el-color-primary-light-3: #48d9d6;
+  --el-color-primary-light-5: #80e6e4;
+  --el-color-primary-light-7: #b3f0ef;
+  --el-color-primary-light-8: #ccf5f4;
+  --el-color-primary-light-9: #e6fafa;
+  --el-color-primary-dark-2: #0bada9;
   --el-color-success: #67c23a;
   --el-color-success-light-3: #95d475;
   --el-color-success-light-9: #f0f9eb;
@@ -300,8 +300,8 @@ body {
 }
 
 .el-tag--primary {
-  background: rgba(64, 158, 255, 0.08);
-  border: 1px solid rgba(64, 158, 255, 0.2);
+  background: rgba(15, 198, 194, 0.08);
+  border: 1px solid rgba(15, 198, 194, 0.2);
   color: var(--el-color-primary);
 }
 
@@ -556,7 +556,7 @@ body {
 .el-step__circle.is-active {
   background: var(--el-color-primary);
   color: var(--el-color-white);
-  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.35);
+  box-shadow: 0 2px 8px rgba(15, 198, 194, 0.35);
   transform: scale(1.05);
 }
 

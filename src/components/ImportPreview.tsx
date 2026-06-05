@@ -1,49 +1,25 @@
 "use client";
 
-import { useCallback, useState, useRef, useMemo } from "react";
+import { useCallback, useState, useMemo } from "react";
 import { useImport } from "@/store/import-context";
 import ExcelTable from "./ExcelTable";
-import { generateExcelBuffer } from "@/lib/excel-parser";
-import { FIELD_LABELS } from "@/types";
-import { getFieldValue } from "@/lib/helpers";
-import { saveAs } from "@/lib/file-saver";
+import { V2_FIELD_LABELS } from "@/types";
 import { useToast } from "./Toast";
 
-const CHUNK_SIZE = 100;
-
 const DISPLAY_FIELDS = [
-  "externalCode", "senderName", "senderPhone", "senderAddress",
-  "receiverName", "receiverPhone", "receiverAddress",
-  "weight", "pieces", "temperatureLevel", "remark",
+  "externalCode", "storeName", "receiverName", "receiverPhone", "receiverAddress", "remark",
 ] as const;
 
 export default function ImportPreview() {
-  const { rows, validationResults, step, setStep, setBatchId, setBatchResult } = useImport();
+  const { orders, validationResults, step, setStep, setBatchId, setBatchResult } = useImport();
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [submitProgress, setSubmitProgress] = useState(0);
   const [submitLabel, setSubmitLabel] = useState("");
   const [successCount, setSuccessCount] = useState(0);
   const [failCount, setFailCount] = useState(0);
-  const [currentChunk, setCurrentChunk] = useState(0);
-  const abortRef = useRef(false);
 
-  const totalChunks = useMemo(() => Math.ceil(rows.length / CHUNK_SIZE), [rows.length]);
   const hasErrors = validationResults.some((vr) => vr.errors.length > 0);
-
-  const handleExport = useCallback(() => {
-    const headers = DISPLAY_FIELDS.map((f) => FIELD_LABELS[f] || f);
-    const data = rows.map((row) => {
-      const obj: Record<string, string> = {};
-      for (const field of DISPLAY_FIELDS) {
-        obj[FIELD_LABELS[field] || field] = String(getFieldValue(row, field) ?? "");
-      }
-      return obj;
-    });
-    const buffer = generateExcelBuffer(headers, data);
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    saveAs(blob, `导入数据预览_${Date.now()}.xlsx`);
-  }, [rows]);
 
   const handleSubmit = async () => {
     if (hasErrors) {
@@ -58,32 +34,27 @@ export default function ImportPreview() {
     setSubmitLabel("正在准备数据...");
     setSuccessCount(0);
     setFailCount(0);
-    setCurrentChunk(0);
-    abortRef.current = false;
 
-    const total = rows.length;
+    const total = orders.length;
     let totalSuccess = 0;
     let totalFail = 0;
     let batchId: string | null = null;
     const startTime = Date.now();
+    const CHUNK_SIZE = 100;
 
     try {
       for (let start = 0; start < total; start += CHUNK_SIZE) {
-        if (abortRef.current) break;
-
-        const chunk = rows.slice(start, start + CHUNK_SIZE);
+        const chunk = orders.slice(start, start + CHUNK_SIZE);
         const end = Math.min(start + CHUNK_SIZE, total);
-        const chunkNum = Math.floor(start / CHUNK_SIZE) + 1;
         const pct = Math.round((end / total) * 100);
 
-        setCurrentChunk(chunkNum);
         setSubmitProgress(pct);
         setSubmitLabel(`正在提交 ${start + 1}-${end} / ${total} 条`);
 
         const submitRes: Response = await fetch("/api/import/submit", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rows: chunk, batchId }),
+          body: JSON.stringify({ orders: chunk, batchId }),
         });
 
         if (!submitRes.ok) {
@@ -97,14 +68,6 @@ export default function ImportPreview() {
         totalFail += result.failCount;
         setSuccessCount(totalSuccess);
         setFailCount(totalFail);
-      }
-
-      if (batchId) {
-        await fetch("/api/import/submit", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ batchId, status: "completed" }),
-        }).catch(() => {});
       }
 
       const elapsed = Math.round((Date.now() - startTime) / 1000);
@@ -143,15 +106,7 @@ export default function ImportPreview() {
         <div style={{ display: "flex", gap: 8 }}>
           <button
             className="el-button el-button--plain el-button--small"
-            onClick={handleExport}
-            disabled={submitting}
-            style={{ opacity: submitting ? 0.5 : undefined, cursor: submitting ? "not-allowed" : undefined }}
-          >
-            导出 Excel
-          </button>
-          <button
-            className="el-button el-button--plain el-button--small"
-            onClick={() => setStep("upload")}
+            onClick={() => setStep("rule")}
             disabled={submitting}
             style={{ opacity: submitting ? 0.5 : undefined, cursor: submitting ? "not-allowed" : undefined }}
           >
@@ -174,7 +129,6 @@ export default function ImportPreview() {
         <ExcelTable />
       </div>
 
-      {/* Overlay progress modal */}
       {(step === "submitting" || submitProgress === 100) && (
         <div
           style={{
@@ -221,7 +175,7 @@ export default function ImportPreview() {
                   {submitLabel}
                 </p>
                 <p style={{ fontSize: 12, color: "var(--el-text-color-secondary)", marginBottom: 16 }}>
-                  第 {currentChunk}/{totalChunks} 批 · 共 {rows.length} 条
+                  共 {orders.length} 条
                 </p>
                 <div className="el-progress-bar" style={{ height: 6, marginBottom: 16 }}>
                   <div className="el-progress-bar__inner" style={{ width: `${submitProgress}%`, transition: "width 0.4s ease" }} />

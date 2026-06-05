@@ -8,20 +8,23 @@ import {
   type ReactNode,
 } from "react";
 import type {
-  WaybillRow,
+  ImportOrderRow,
   ColumnMapping,
   ValidationResult,
   ParsedData,
   ImportBatch,
+  ParseRuleConfig,
 } from "@/types";
-import { validateAll } from "@/lib/validator";
+import { validateAllOrders } from "@/lib/validator";
 
 interface ImportState {
-  step: "upload" | "mapping" | "preview" | "submitting" | "result";
+  step: "upload" | "rule" | "preview" | "submitting" | "result";
   parsedData: ParsedData | null;
   columnMapping: ColumnMapping | null;
-  rows: WaybillRow[];
+  orders: ImportOrderRow[];
   validationResults: ValidationResult[];
+  selectedRule: ParseRuleConfig | null;
+  aiGeneratedRule: ParseRuleConfig | null;
   batchId: string | null;
   batchResult: ImportBatch | null;
   progress: { current: number; total: number };
@@ -31,7 +34,9 @@ interface ImportState {
 interface ImportContextValue extends ImportState {
   setParsedData: (data: ParsedData) => void;
   setColumnMapping: (mapping: ColumnMapping) => void;
-  setRows: (rows: WaybillRow[]) => void;
+  setOrders: (orders: ImportOrderRow[]) => void;
+  setSelectedRule: (rule: ParseRuleConfig | null) => void;
+  setAiGeneratedRule: (rule: ParseRuleConfig | null) => void;
   applyMapping: (mapping: ColumnMapping) => void;
   updateRow: (index: number, field: string, value: string | number) => void;
   addRow: () => void;
@@ -49,8 +54,10 @@ const initialState: ImportState = {
   step: "upload",
   parsedData: null,
   columnMapping: null,
-  rows: [],
+  orders: [],
   validationResults: [],
+  selectedRule: null,
+  aiGeneratedRule: null,
   batchId: null,
   batchResult: null,
   progress: { current: 0, total: 0 },
@@ -70,8 +77,16 @@ export function ImportProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, columnMapping: mapping }));
   }, []);
 
-  const setRows = useCallback((rows: WaybillRow[]) => {
-    setState((prev) => ({ ...prev, rows }));
+  const setOrders = useCallback((orders: ImportOrderRow[]) => {
+    setState((prev) => ({ ...prev, orders }));
+  }, []);
+
+  const setSelectedRule = useCallback((rule: ParseRuleConfig | null) => {
+    setState((prev) => ({ ...prev, selectedRule: rule }));
+  }, []);
+
+  const setAiGeneratedRule = useCallback((rule: ParseRuleConfig | null) => {
+    setState((prev) => ({ ...prev, aiGeneratedRule: rule }));
   }, []);
 
   const applyMapping = useCallback((mapping: ColumnMapping) => {
@@ -79,45 +94,35 @@ export function ImportProvider({ children }: { children: ReactNode }) {
       if (!prev.parsedData) return prev;
 
       const systemFields = [
-        "senderName", "senderPhone", "senderAddress",
+        "externalCode", "storeName",
         "receiverName", "receiverPhone", "receiverAddress",
-        "weight", "pieces", "temperatureLevel",
-        "externalCode", "remark",
+        "remark",
       ] as const;
 
-      const rows: WaybillRow[] = prev.parsedData.rows.map((row, i) => {
-        const mapped: Record<string, string | number> = {};
+      const orders: ImportOrderRow[] = prev.parsedData.rows.map((row, i) => {
+        const mapped: Record<string, string> = {};
         for (const [excelCol, systemField] of Object.entries(mapping)) {
           if (systemField && systemFields.includes(systemField as typeof systemFields[number])) {
-            let value: string | number = row[excelCol] ?? "";
-            if (systemField === "weight" || systemField === "pieces") {
-              const num = Number(value);
-              value = isNaN(num) ? value : num;
-            }
-            mapped[systemField] = value;
+            mapped[systemField] = String(row[excelCol] ?? "");
           }
         }
         return {
-          id: `row-${i}-${Date.now()}`,
-          senderName: String(mapped.senderName ?? ""),
-          senderPhone: String(mapped.senderPhone ?? ""),
-          senderAddress: String(mapped.senderAddress ?? ""),
-          receiverName: String(mapped.receiverName ?? ""),
-          receiverPhone: String(mapped.receiverPhone ?? ""),
-          receiverAddress: String(mapped.receiverAddress ?? ""),
-          weight: Number(mapped.weight) || 0,
-          pieces: Number(mapped.pieces) || 0,
-          temperatureLevel: (String(mapped.temperatureLevel ?? "") as WaybillRow["temperatureLevel"]),
-          externalCode: mapped.externalCode ? String(mapped.externalCode) : undefined,
-          remark: mapped.remark ? String(mapped.remark) : undefined,
-        } as WaybillRow;
+          id: `order-${i}-${Date.now()}`,
+          externalCode: mapped.externalCode || undefined,
+          storeName: mapped.storeName || undefined,
+          receiverName: mapped.receiverName || undefined,
+          receiverPhone: mapped.receiverPhone || undefined,
+          receiverAddress: mapped.receiverAddress || undefined,
+          remark: mapped.remark || undefined,
+          items: [],
+        };
       });
 
-      const validationResults = validateAll(rows);
+      const validationResults = validateAllOrders(orders);
       return {
         ...prev,
         columnMapping: mapping,
-        rows,
+        orders,
         validationResults,
         step: "preview",
       };
@@ -127,10 +132,10 @@ export function ImportProvider({ children }: { children: ReactNode }) {
   const updateRow = useCallback(
     (index: number, field: string, value: string | number) => {
       setState((prev) => {
-        const newRows = [...prev.rows];
-        newRows[index] = { ...newRows[index], [field]: value };
-        const validationResults = validateAll(newRows);
-        return { ...prev, rows: newRows, validationResults };
+        const newOrders = [...prev.orders];
+        newOrders[index] = { ...newOrders[index], [field]: value };
+        const validationResults = validateAllOrders(newOrders);
+        return { ...prev, orders: newOrders, validationResults };
       });
     },
     []
@@ -138,31 +143,29 @@ export function ImportProvider({ children }: { children: ReactNode }) {
 
   const addRow = useCallback(() => {
     setState((prev) => {
-      const newRow: WaybillRow = {
-        id: `row-${prev.rows.length}-${Date.now()}`,
-        senderName: "",
-        senderPhone: "",
-        senderAddress: "",
+      const newOrder: ImportOrderRow = {
+        id: `order-${prev.orders.length}-${Date.now()}`,
+        storeName: "",
         receiverName: "",
         receiverPhone: "",
         receiverAddress: "",
-        weight: 0,
-        pieces: 0,
-        temperatureLevel: "",
+        externalCode: "",
+        remark: "",
+        items: [],
       };
-      const newRows = [...prev.rows, newRow];
-      const validationResults = validateAll(newRows);
-      return { ...prev, rows: newRows, validationResults };
+      const newOrders = [...prev.orders, newOrder];
+      const validationResults = validateAllOrders(newOrders);
+      return { ...prev, orders: newOrders, validationResults };
     });
   }, []);
 
   const deleteRows = useCallback((indices: number[]) => {
     setState((prev) => {
-      const newRows = prev.rows.filter(
+      const newOrders = prev.orders.filter(
         (_, i) => !indices.includes(i)
       );
-      const validationResults = validateAll(newRows);
-      return { ...prev, rows: newRows, validationResults };
+      const validationResults = validateAllOrders(newOrders);
+      return { ...prev, orders: newOrders, validationResults };
     });
   }, []);
 
@@ -191,7 +194,7 @@ export function ImportProvider({ children }: { children: ReactNode }) {
 
   const revalidate = useCallback((existingCodes?: Set<string>) => {
     setState((prev) => {
-      const validationResults = validateAll(prev.rows, existingCodes);
+      const validationResults = validateAllOrders(prev.orders, existingCodes);
       return { ...prev, validationResults };
     });
   }, []);
@@ -206,7 +209,9 @@ export function ImportProvider({ children }: { children: ReactNode }) {
         ...state,
         setParsedData,
         setColumnMapping,
-        setRows,
+        setOrders,
+        setSelectedRule,
+        setAiGeneratedRule,
         applyMapping,
         updateRow,
         addRow,

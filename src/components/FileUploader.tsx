@@ -76,7 +76,7 @@ export default function FileUploader() {
         await new Promise((r) => setTimeout(r, 200));
 
         setParsedData(result.data);
-        setStep("mapping");
+        setStep("rule");
       } catch {
         setError("文件读取失败，请重试");
         setParsing(false);
