@@ -253,13 +253,13 @@ export default function ExcelTable() {
           <div style={{ width: COL_WIDTHS.skuInfo, textAlign: "center", padding: "8px 0", flexShrink: 0 }}>SKU</div>
         </div>
         <List
-          height={containerHeight}
-          itemCount={orders.length}
-          itemSize={ROW_HEIGHT}
-          width="100%"
-        >
-          {RowComponent}
-        </List>
+          defaultHeight={containerHeight}
+          rowCount={orders.length}
+          rowHeight={ROW_HEIGHT}
+          style={{ height: containerHeight, width: "100%" }}
+          rowComponent={RowComponent}
+          rowProps={{} as any}
+        />
       </div>
 
       {validationResults.length > 0 && (
