@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, createElement, type CSSProperties } from "react";
+import { useState, useMemo, useCallback, type CSSProperties } from "react";
 import { List } from "react-window";
 import { useImport } from "@/store/import-context";
 import CellEditor from "./CellEditor";
@@ -37,10 +37,11 @@ const COL_WIDTHS: Record<string, string> = {
 };
 
 export default function ExcelTable() {
-  const { orders, validationResults, updateRow, addRow, deleteRows } = useImport();
-
+  const { orders, validationResults, updateRow, addRow, deleteRows, setOrders, revalidate } = useImport();
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [editingCell, setEditingCell] = useState<{ row: number; field: string } | null>(null);
+  const [skuEditor, setSkuEditor] = useState<{ row: number } | null>(null);
+  const [editItems, setEditItems] = useState<{ skuCode: string; skuName: string; quantity: number; spec: string }[]>([]);
 
   const errorMap = useMemo(() => {
     const map = new Map<number, typeof validationResults[0]["errors"]>();
@@ -91,14 +92,67 @@ export default function ExcelTable() {
     setEditingCell(null);
   };
 
+  const openSkuEditor = (rowIndex: number) => {
+    const order = orders[rowIndex];
+    setEditItems(
+      (order.items || []).map((i) => ({
+        skuCode: i.skuCode,
+        skuName: i.skuName,
+        quantity: i.quantity,
+        spec: i.spec || "",
+      }))
+    );
+    setSkuEditor({ row: rowIndex });
+  };
+
+  const closeSkuEditor = () => {
+    setSkuEditor(null);
+    setEditItems([]);
+  };
+
+  const saveSkuEditor = () => {
+    if (!skuEditor) return;
+    const newOrders = [...orders];
+    newOrders[skuEditor.row] = {
+      ...newOrders[skuEditor.row],
+      items: editItems
+        .filter((i) => i.skuCode || i.skuName)
+        .map((i) => ({
+          skuCode: i.skuCode,
+          skuName: i.skuName,
+          quantity: i.quantity,
+          spec: i.spec || undefined,
+        })),
+    };
+    setOrders(newOrders);
+    revalidate();
+    closeSkuEditor();
+  };
+
+  const updateEditItem = (idx: number, field: string, value: string | number) => {
+    setEditItems((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], [field]: value };
+      return next;
+    });
+  };
+
+  const addEditItem = () => {
+    setEditItems((prev) => [...prev, { skuCode: "", skuName: "", quantity: 0, spec: "" }]);
+  };
+
+  const removeEditItem = (idx: number) => {
+    setEditItems((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const totalErrors = validationResults.reduce((s, vr) => s + vr.errors.length, 0);
   const totalDuplicates = validationResults.reduce((s, vr) => s + vr.duplicates.length, 0);
 
   const ROW_HEIGHT = 36;
   const containerHeight = Math.min(orders.length * ROW_HEIGHT + 8, 500);
 
-  const RowComponent: (props: { index: number; style: CSSProperties }) => ReturnType<typeof createElement> = useCallback(
-    ({ index, style }) => {
+  const RowComponent = useCallback(
+    ({ index, style }: { index: number; style: CSSProperties }) => {
       const order = orders[index];
       const rowErrors = errorMap.get(index);
       const rowDuplicates = duplicateMap.get(index);
@@ -143,8 +197,12 @@ export default function ExcelTable() {
               </div>
             );
           })}
-          <div style={{ width: COL_WIDTHS.skuInfo, textAlign: "center", fontSize: 12, color: "var(--el-text-color-secondary)", flexShrink: 0, padding: "0 8px", boxSizing: "border-box" }}>
-            {(order.items?.length || 0) > 0 ? `${order.items!.length} 个` : "-"}
+          <div
+            style={{ width: COL_WIDTHS.skuInfo, textAlign: "center", fontSize: 12, color: "var(--el-color-primary)", flexShrink: 0, padding: "0 8px", boxSizing: "border-box", cursor: "pointer", fontWeight: 500 }}
+            onClick={() => openSkuEditor(index)}
+            title="点击编辑 SKU"
+          >
+            {(order.items?.length || 0) > 0 ? `${order.items!.length} 个` : "+ 添加"}
           </div>
         </div>
       );
@@ -194,13 +252,14 @@ export default function ExcelTable() {
           ))}
           <div style={{ width: COL_WIDTHS.skuInfo, textAlign: "center", padding: "8px 0", flexShrink: 0 }}>SKU</div>
         </div>
-        {createElement(List, {
-          rowCount: orders.length,
-          rowHeight: ROW_HEIGHT,
-          rowComponent: RowComponent,
-          rowProps: {} as any,
-          style: { height: containerHeight, width: "100%" } as CSSProperties,
-        })}
+        <List
+          height={containerHeight}
+          itemCount={orders.length}
+          itemSize={ROW_HEIGHT}
+          width="100%"
+        >
+          {RowComponent}
+        </List>
       </div>
 
       {validationResults.length > 0 && (
@@ -227,6 +286,66 @@ export default function ExcelTable() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {skuEditor && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 1000,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeSkuEditor(); }}
+        >
+          <div
+            style={{
+              background: "#fff", borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+              padding: 24, minWidth: 500, maxWidth: 640,
+            }}
+          >
+            <p style={{ fontWeight: 600, fontSize: 15, marginBottom: 16 }}>
+              编辑 SKU 物品 — 第 {skuEditor.row + 1} 行
+            </p>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--el-border-color-light)" }}>
+                  <th style={{ padding: "6px 8px", textAlign: "left" }}>SKU 编码</th>
+                  <th style={{ padding: "6px 8px", textAlign: "left" }}>SKU 名称</th>
+                  <th style={{ padding: "6px 8px", textAlign: "left", width: 80 }}>数量</th>
+                  <th style={{ padding: "6px 8px", textAlign: "left", width: 100 }}>规格</th>
+                  <th style={{ padding: "6px 8px", textAlign: "center", width: 50 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {editItems.map((item, idx) => (
+                  <tr key={idx} style={{ borderBottom: "1px solid var(--el-border-color-light)" }}>
+                    <td style={{ padding: "4px" }}>
+                      <input className="el-input__inner" style={{ height: 30, fontSize: 13, width: "100%" }} value={item.skuCode} onChange={(e) => updateEditItem(idx, "skuCode", e.target.value)} placeholder="SKU001" />
+                    </td>
+                    <td style={{ padding: "4px" }}>
+                      <input className="el-input__inner" style={{ height: 30, fontSize: 13, width: "100%" }} value={item.skuName} onChange={(e) => updateEditItem(idx, "skuName", e.target.value)} placeholder="商品名称" />
+                    </td>
+                    <td style={{ padding: "4px" }}>
+                      <input className="el-input__inner" style={{ height: 30, fontSize: 13, width: "100%" }} type="number" min={1} value={item.quantity || ""} onChange={(e) => updateEditItem(idx, "quantity", parseInt(e.target.value) || 0)} />
+                    </td>
+                    <td style={{ padding: "4px" }}>
+                      <input className="el-input__inner" style={{ height: 30, fontSize: 13, width: "100%" }} value={item.spec} onChange={(e) => updateEditItem(idx, "spec", e.target.value)} placeholder="规格（选填）" />
+                    </td>
+                    <td style={{ padding: "4px", textAlign: "center" }}>
+                      <button className="el-button el-button--danger el-button--small" style={{ padding: "0 6px", fontSize: 12, lineHeight: "22px" }} onClick={() => removeEditItem(idx)}>×</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <button className="el-button el-button--plain el-button--small" onClick={addEditItem} style={{ marginTop: 12 }}>
+              + 添加 SKU
+            </button>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+              <button className="el-button el-button--plain el-button--small" onClick={closeSkuEditor}>取消</button>
+              <button className="el-button el-button--primary el-button--small" onClick={saveSkuEditor}>保存</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -265,7 +265,7 @@ function validateConfig(config, testName) {
 
 async function callAI(systemPrompt, userContent) {
   const { baseUrl, apiKey, model, maxTokens, temperature } = AI_CONFIG;
-  const url = `${baseUrl.replace(/\/$/, "")}/chat/completions`;
+  const url = `${baseUrl.replace(/\/$/, "")}/v1/chat/completions`;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 180_000);

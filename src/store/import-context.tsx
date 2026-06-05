@@ -104,18 +104,32 @@ export function ImportProvider({ children }: { children: ReactNode }) {
     setState((prev) => {
       if (!prev.parsedData) return prev;
 
-      const systemFields = [
+      const headerFields = new Set([
         "externalCode", "storeName",
         "receiverName", "receiverPhone", "receiverAddress",
         "remark",
-      ] as const;
+      ]);
+      const itemFields = new Set(["skuCode", "skuName", "quantity", "spec"]);
 
       const orders: ImportOrderRow[] = prev.parsedData.rows.map((row, i) => {
         const mapped: Record<string, string> = {};
+        const itemMapped: Record<string, string> = {};
         for (const [excelCol, systemField] of Object.entries(mapping)) {
-          if (systemField && systemFields.includes(systemField as typeof systemFields[number])) {
+          if (systemField && headerFields.has(systemField)) {
             mapped[systemField] = String(row[excelCol] ?? "");
           }
+          if (systemField && itemFields.has(systemField)) {
+            itemMapped[systemField] = String(row[excelCol] ?? "");
+          }
+        }
+        const items: ImportOrderRow["items"] = [];
+        if (itemMapped.skuCode || itemMapped.skuName) {
+          items.push({
+            skuCode: itemMapped.skuCode || "",
+            skuName: itemMapped.skuName || "",
+            quantity: Number(itemMapped.quantity) || 0,
+            spec: itemMapped.spec || undefined,
+          });
         }
         return {
           id: `order-${i}-${Date.now()}`,
@@ -125,7 +139,7 @@ export function ImportProvider({ children }: { children: ReactNode }) {
           receiverPhone: mapped.receiverPhone || undefined,
           receiverAddress: mapped.receiverAddress || undefined,
           remark: mapped.remark || undefined,
-          items: [],
+          items,
         };
       });
 

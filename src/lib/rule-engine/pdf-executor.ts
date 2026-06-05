@@ -127,6 +127,7 @@ export async function executePdf(
 ): Promise<ExecutorResult> {
   try {
     const pdfjsLib = await import("pdfjs-dist");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
     const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
     const textParts: string[] = [];
 

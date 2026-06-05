@@ -45,6 +45,7 @@ async function parseWord(buffer: ArrayBuffer): Promise<ParsedData> {
 
 async function parsePdf(buffer: ArrayBuffer): Promise<ParsedData> {
   const pdfjsLib = await import("pdfjs-dist");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
   const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
   const textParts: string[] = [];
   for (let i = 1; i <= pdf.numPages; i++) {
