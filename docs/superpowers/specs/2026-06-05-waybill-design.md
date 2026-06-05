@@ -57,6 +57,8 @@ model ImportOrder {
 
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+
+  @@index([convertedAt])
 }
 ```
 
@@ -111,13 +113,15 @@ model ImportBatch {
 2. 查询指定 batchId 下 `convertedAt IS NULL` 的 ImportOrder
    - 若 orderIds 不为空，额外过滤只保留 orderIds 中的且未转换的
    - 若无有效订单，返回 400 "没有可转为运单的订单"
-3. 校验每行：receiverName/receiverPhone/receiverAddress 不可为空（Waybill 模型要求非空）
-   - 有空值的行计入 failedRows，不阻塞其他行
+3. 校验每行：
+   - receiverName/receiverPhone/receiverAddress 不可为空（Waybill 模型要求非空）→ 为空时计入 failedRows
+   - weight/pieces/temperatureLevel 为空时使用默认值（weight=0, pieces=0, temperatureLevel="常温"）
+   - 有空值/默认值的行不阻塞其他行
 4. 事务内执行：
    - 创建 Waybill 记录（每条 ImportOrder 一条）：
      - senderName/senderPhone/senderAddress 使用请求传入的值
      - receiverName/receiverPhone/receiverAddress/externalCode/remark 从 ImportOrder 复制
-     - weight/pieces/temperatureLevel 从 ImportOrder 复制
+     - weight/pieces/temperatureLevel 从 ImportOrder 复制（空则用默认值）
    - 更新对应 ImportOrder 的 convertedAt = now()
    - 若批次内所有 ImportOrder 均已转换（convertedAt 全部非空），更新 ImportBatch.status = "converted"
 5. 返回创建结果
@@ -127,7 +131,7 @@ model ImportBatch {
 {
   "successCount": 50,
   "failCount": 0,
-  "failedRows": [{ "rowIndex": 5, "error": "收件人电话为空" }]
+  "failedRows": [{ "orderId": "xxx", "externalCode": "yyy", "error": "收件人电话为空" }]
 }
 ```
 
@@ -159,7 +163,7 @@ model ImportBatch {
 
 将原 `/api/waybills` 的 ImportOrder 查询逻辑迁移到 `/api/orders/route.ts`，供 `/import/history` 页面使用。
 
-参数与响应格式与当前 `/api/waybills` 一致。
+参数与响应格式与当前 `/api/waybills` 的现有行为一致（即查询 ImportOrder + OrderItem，当前实现实际上查询的是 ImportOrder，/api/waybills 修正后 /api/orders 接过这个职责）。
 
 ## 页面设计
 
@@ -179,6 +183,7 @@ model ImportBatch {
    - 重量/件数/温层可编辑（Inline CellEditor）
    - 行前 checkbox 支持多选
    - 顶部全选 checkbox
+   - 注意：`storeName`（收货门店）仅在表格中展示参考，不会写入 Waybill（Waybill 模型无此字段）
    - 已转换的订单（convertedAt 不为空）灰化不可选
 
 3. **操作栏**（底部固定）
