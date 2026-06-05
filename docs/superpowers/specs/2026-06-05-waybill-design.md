@@ -105,25 +105,28 @@ model ImportBatch {
   "senderName": "string (必填)",
   "senderPhone": "string (必填)",
   "senderAddress": "string (必填)",
-  "orderIds": ["string"]  // 可选，为空则转换该批次全部未转换的订单
+  "orderIds": ["string"],  // 可选，为空则转换该批次全部未转换的订单
+  "overrides": {           // 可选，用户在表格中编辑后的字段覆盖
+    "orderId_xxx": { "weight": 12.5, "pieces": 3, "temperatureLevel": "冷藏" }
+  }
 }
 ```
 
 **处理逻辑（使用 Prisma $transaction 保证原子性）：**
 1. 校验 batchId 存在，否则返回 400
-2. 查询指定 batchId 下 `convertedAt IS NULL` 的 ImportOrder
+2. 在事务内查询指定 batchId 下 `convertedAt IS NULL` 的 ImportOrder
    - 若 orderIds 不为空，额外过滤只保留 orderIds 中的且未转换的
    - 若无有效订单，返回 400 "没有可转为运单的订单"
 3. 校验每行：
    - receiverName/receiverPhone/receiverAddress 不可为空（Waybill 模型要求非空）→ 为空时计入 failedRows
    - weight/pieces/temperatureLevel 为空时使用默认值（weight=0, pieces=0, temperatureLevel="常温"）
-   - 有空值/默认值的行不阻塞其他行
+   - 有空值/默认值的行不阻塞其他行；用户可通过 overrides 覆盖空值
 4. 事务内执行：
-   - 创建 Waybill 记录（每条 ImportOrder 一条）：
+   - 先通过 `updateMany({ where: { id: { in: validOrderIds }, convertedAt: null }, data: { convertedAt: new Date() } })` 标记转换，防止并发重复处理（返回 count 为 0 的订单跳过）
+   - 再查询成功标记的订单，创建 Waybill 记录（每条 ImportOrder 一条）：
      - senderName/senderPhone/senderAddress 使用请求传入的值
      - receiverName/receiverPhone/receiverAddress/externalCode/remark 从 ImportOrder 复制
-     - weight/pieces/temperatureLevel 从 ImportOrder 复制（空则用默认值）
-   - 更新对应 ImportOrder 的 convertedAt = now()
+     - weight/pieces/temperatureLevel 优先使用 `overrides` 中的值，没有则从 ImportOrder 复制（空则用默认值）
    - 若批次内所有 ImportOrder 均已转换（convertedAt 全部非空），更新 ImportBatch.status = "converted"
 5. 返回创建结果
 
@@ -229,9 +232,23 @@ model ImportBatch {
 ### 注意事项
 
 - **ImportBatch 状态枚举**：现有代码中若存在 `status` 白名单校验（如只允许 `pending | processing | completed | failed`），需更新为包含 `converted`，否则新状态会被拒绝
-- **并发安全**：`convertedAt` + `$transaction` 确保重复调用不会重复创建 Waybill
+- **并发安全**：API 先通过 `updateMany` 标记 convertedAt（只在 convertedAt IS NULL 时更新），然后只处理成功标记的行。即便并发请求，同一条订单也只会被转换一次
 
 ## 组件结构
+
+### WaybillCreateTable Props
+
+```typescript
+interface WaybillCreateTableProps {
+  orders: ImportOrderRow[];              // 该批次订单数据
+  convertedIds: Set<string>;            // 已转换的订单 ID 集合
+  selectedIds: Set<string>;             // 当前选中的订单 ID 集合
+  onSelectionChange: (ids: Set<string>) => void;  // 选中变更回调
+  onCellEdit: (orderId: string, field: string, value: string | number) => void;  // 编辑回调
+}
+```
+
+### 文件结构
 
 ```
 src/
@@ -241,7 +258,7 @@ src/
 │   │   │   └── route.ts          # ImportOrder 历史查询（从 /api/waybills 迁移）
 │   │   └── waybills/
 │   │       ├── create-from-batch/
-│   │       │   └── route.ts      # 转运单 API（事务保护）
+│   │       │   └── route.ts      # 转运单 API（事务保护 + 防并发）
 │   │       └── route.ts          # Waybill 历史查询（修正为 queryWaybills）
 │   ├── waybills/
 │   │   ├── create/
