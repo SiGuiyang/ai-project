@@ -107,7 +107,7 @@ model ImportBatch {
   "senderAddress": "string (必填)",
   "orderIds": ["string"],  // 可选，为空则转换该批次全部未转换的订单
   "overrides": {           // 可选，用户在表格中编辑后的字段覆盖
-    "orderId_xxx": { "weight": 12.5, "pieces": 3, "temperatureLevel": "冷藏" }
+    "${orderId}": { "weight": 12.5, "pieces": 3, "temperatureLevel": "冷藏" }
   }
 }
 ```
@@ -169,6 +169,11 @@ model ImportBatch {
 
 参数与响应格式与当前 `/api/waybills` 的现有行为一致（即查询 ImportOrder + OrderItem，当前实现实际上查询的是 ImportOrder，/api/waybills 修正后 /api/orders 接过这个职责）。
 
+**错误响应：**
+| 状态码 | 场景 | 响应体 |
+|--------|------|--------|
+| 500 | 数据库异常 | `{ "error": "查询失败" }` |
+
 ## 页面设计
 
 ### 新增 /waybills/create?batchId=xxx — 转为运单工作页
@@ -187,8 +192,9 @@ model ImportBatch {
    - 重量/件数/温层可编辑（Inline CellEditor）
    - 行前 checkbox 支持多选
    - 顶部全选 checkbox
-   - 注意：`storeName`（收货门店）仅在表格中展示参考，不会写入 Waybill（Waybill 模型无此字段）
+   - 注意：`storeName`（收货门店）仅在表格中展示参考，不会写入 Waybill（Waybill 模型无此字段），用户可见但不会传输
    - 已转换的订单（convertedAt 不为空）灰化不可选
+   - 全部订单已转换时：表格置灰显示「该批次所有订单已转为运单」，并提供「查看运单记录」按钮
 
 3. **操作栏**（底部固定）
    - 显示「已选中 X / 共 Y 条」
