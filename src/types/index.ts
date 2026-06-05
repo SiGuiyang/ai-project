@@ -62,7 +62,7 @@ export interface ImportBatch {
   totalCount: number;
   successCount: number;
   failCount: number;
-  status: "pending" | "processing" | "completed" | "failed";
+  status: "pending" | "processing" | "completed" | "failed" | "converted";
 }
 
 export type FieldLabelMap = Record<string, string>;
@@ -88,6 +88,9 @@ export const FIELD_ALIASES: FieldLabelMap = {
   "发货电话": "senderPhone",
   "发件地址": "senderAddress",
   "发货地址": "senderAddress",
+  "重量": "weight",
+  "件数": "pieces",
+  "温层": "temperatureLevel",
   "收件人": "receiverName",
   "收货人": "receiverName",
   "收件电话": "receiverPhone",
@@ -120,6 +123,13 @@ export interface ImportOrderRow {
   receiverAddress?: string;
   remark?: string;
   items: OrderItemRow[];
+  senderName?: string;
+  senderPhone?: string;
+  senderAddress?: string;
+  weight?: number;
+  pieces?: number;
+  temperatureLevel?: string;
+  convertedAt?: string;
 }
 
 export type AggFunction = "sum" | "first" | "concat";
@@ -158,4 +168,10 @@ export const V2_FIELD_LABELS: Record<string, string> = {
   quantity: "SKU发货数量",
   spec: "SKU规格型号",
   remark: "备注",
+  senderName: "发件人姓名",
+  senderPhone: "发件人电话",
+  senderAddress: "发件人地址",
+  weight: "重量(kg)",
+  pieces: "件数",
+  temperatureLevel: "温层",
 };

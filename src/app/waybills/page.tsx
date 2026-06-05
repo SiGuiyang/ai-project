@@ -1,38 +1,38 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import type { ImportOrderRow } from "@/types";
 
-interface OrderRecord {
+interface WaybillRecord {
   id: string;
   batchId: string;
   externalCode: string | null;
-  storeName: string | null;
-  receiverName: string | null;
-  receiverPhone: string | null;
+  senderName: string;
+  senderPhone: string;
+  senderAddress: string;
+  receiverName: string;
+  receiverPhone: string;
+  receiverAddress: string;
+  weight: number;
+  pieces: number;
+  temperatureLevel: string;
   createdAt: string;
-  items: Array<{
-    skuCode: string;
-    skuName: string;
-    quantity: number;
-    spec: string | null;
-  }>;
 }
 
 interface PageData {
-  data: OrderRecord[];
+  data: WaybillRecord[];
   total: number;
   page: number;
   pageSize: number;
   totalPages: number;
 }
 
-export default function HistoryPage() {
+export default function WaybillsPage() {
   const [data, setData] = useState<PageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [externalCode, setExternalCode] = useState("");
   const [receiverName, setReceiverName] = useState("");
+  const [senderName, setSenderName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const pageSize = 20;
@@ -43,17 +43,18 @@ export default function HistoryPage() {
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (externalCode) params.set("externalCode", externalCode);
       if (receiverName) params.set("receiverName", receiverName);
+      if (senderName) params.set("senderName", senderName);
       if (startDate) params.set("startDate", startDate);
       if (endDate) params.set("endDate", endDate);
-      const res = await fetch(`/api/orders?${params}`);
+      const res = await fetch(`/api/waybills?${params}`);
       const json = await res.json();
       setData(json);
     } catch {
-      // handle error
+      // handle error silently
     } finally {
       setLoading(false);
     }
-  }, [page, externalCode, receiverName, startDate, endDate, pageSize]);
+  }, [page, externalCode, receiverName, senderName, startDate, endDate, pageSize]);
 
   useEffect(() => {
     fetchData();
@@ -62,77 +63,29 @@ export default function HistoryPage() {
   return (
     <div className="el-card">
       <div className="el-card__header">
-        <span style={{ fontWeight: 500, fontSize: 16 }}>已导入订单记录</span>
+        <span style={{ fontWeight: 500, fontSize: 16 }}>运单管理</span>
         <span style={{ fontSize: 13, color: "var(--el-text-color-secondary)" }}>
           {data ? `共 ${data.total} 条` : ""}
         </span>
       </div>
       <div className="el-card__body">
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            marginBottom: 16,
-            flexWrap: "wrap",
-            padding: "12px 16px",
-            background: "var(--el-bg-color)",
-            borderRadius: 8,
-            border: "1px solid var(--el-border-color-lighter)",
-          }}
-        >
+        <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", padding: "12px 16px", background: "var(--el-bg-color)", borderRadius: 8, border: "1px solid var(--el-border-color-lighter)" }}>
           <div className="el-input" style={{ flex: 1, minWidth: 160, maxWidth: 220 }}>
-            <input
-              className="el-input__inner"
-              placeholder="搜索外部编码"
-              value={externalCode}
-              onChange={(e) => { setExternalCode(e.target.value); setPage(1); }}
-            />
+            <input className="el-input__inner" placeholder="搜索外部编码" value={externalCode} onChange={(e) => { setExternalCode(e.target.value); setPage(1); }} />
           </div>
           <div className="el-input" style={{ flex: 1, minWidth: 160, maxWidth: 220 }}>
-            <input
-              className="el-input__inner"
-              placeholder="搜索收件人姓名"
-              value={receiverName}
-              onChange={(e) => { setReceiverName(e.target.value); setPage(1); }}
-            />
+            <input className="el-input__inner" placeholder="搜索发件人" value={senderName} onChange={(e) => { setSenderName(e.target.value); setPage(1); }} />
           </div>
-          <div className="el-date-picker">
+          <div className="el-input" style={{ flex: 1, minWidth: 160, maxWidth: 220 }}>
+            <input className="el-input__inner" placeholder="搜索收件人" value={receiverName} onChange={(e) => { setReceiverName(e.target.value); setPage(1); }} />
+          </div>
+          <div className="el-date-picker" style={{ display: "flex", gap: 4, alignItems: "center" }}>
             <div className="el-input" style={{ width: 155 }}>
-              <span className="el-input__prefix">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <rect x="1" y="2" width="12" height="11" rx="2" stroke="currentColor" strokeWidth="1.2"/>
-                  <line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" strokeWidth="1.2"/>
-                  <line x1="4" y1="0.5" x2="4" y2="3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                  <line x1="10" y1="0.5" x2="10" y2="3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                </svg>
-              </span>
-              <input
-                className="el-input__inner"
-                type="date"
-                value={startDate}
-                onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-                placeholder="开始日期"
-                style={{ paddingLeft: 28, color: startDate ? undefined : "var(--el-text-color-placeholder)" }}
-              />
+              <input className="el-input__inner" type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} placeholder="开始日期" />
             </div>
-            <span className="el-date-picker__separator">至</span>
+            <span>至</span>
             <div className="el-input" style={{ width: 155 }}>
-              <span className="el-input__prefix">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <rect x="1" y="2" width="12" height="11" rx="2" stroke="currentColor" strokeWidth="1.2"/>
-                  <line x1="1" y1="6" x2="13" y2="6" stroke="currentColor" strokeWidth="1.2"/>
-                  <line x1="4" y1="0.5" x2="4" y2="3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                  <line x1="10" y1="0.5" x2="10" y2="3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                </svg>
-              </span>
-              <input
-                className="el-input__inner"
-                type="date"
-                value={endDate}
-                onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-                placeholder="结束日期"
-                style={{ paddingLeft: 28, color: endDate ? undefined : "var(--el-text-color-placeholder)" }}
-              />
+              <input className="el-input__inner" type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} placeholder="结束日期" />
             </div>
           </div>
         </div>
@@ -158,7 +111,7 @@ export default function HistoryPage() {
                 <line x1="14" y1="32" x2="26" y2="32" stroke="var(--el-border-color)" strokeWidth="2" strokeLinecap="round"/>
               </svg>
             </div>
-            <div className="el-empty__text">暂无记录</div>
+            <div className="el-empty__text">暂无运单记录</div>
           </div>
         ) : (
           <>
@@ -167,35 +120,32 @@ export default function HistoryPage() {
                 <thead>
                   <tr>
                     <th className="el-table__header">外部编码</th>
-                    <th className="el-table__header">收货门店</th>
+                    <th className="el-table__header">发件人</th>
+                    <th className="el-table__header">发件人电话</th>
                     <th className="el-table__header">收件人</th>
                     <th className="el-table__header">收件人电话</th>
-                    <th className="el-table__header">SKU编码</th>
-                    <th className="el-table__header">SKU名称</th>
-                    <th className="el-table__header">数量</th>
-                    <th className="el-table__header">规格</th>
-                    <th className="el-table__header">提交时间</th>
+                    <th className="el-table__header">重量(kg)</th>
+                    <th className="el-table__header">件数</th>
+                    <th className="el-table__header">温层</th>
+                    <th className="el-table__header">创建时间</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.data.map((row) => {
-                    const firstItem = row.items?.[0];
-                    return (
-                      <tr key={row.id}>
-                        <td>{row.externalCode || <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
-                        <td>{row.storeName || <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
-                        <td>{row.receiverName || <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
-                        <td>{row.receiverPhone || <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
-                        <td>{firstItem?.skuCode || <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
-                        <td>{firstItem?.skuName || <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
-                        <td>{firstItem?.quantity ?? <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
-                        <td>{firstItem?.spec || <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
-                        <td style={{ whiteSpace: "nowrap", color: "var(--el-text-color-secondary)", fontSize: 13 }}>
-                          {new Date(row.createdAt).toLocaleString("zh-CN")}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {data.data.map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.externalCode || <span style={{ color: "var(--el-text-color-placeholder)" }}>-</span>}</td>
+                      <td>{row.senderName}</td>
+                      <td>{row.senderPhone}</td>
+                      <td>{row.receiverName}</td>
+                      <td>{row.receiverPhone}</td>
+                      <td>{row.weight}</td>
+                      <td>{row.pieces}</td>
+                      <td>{row.temperatureLevel}</td>
+                      <td style={{ whiteSpace: "nowrap", color: "var(--el-text-color-secondary)", fontSize: 13 }}>
+                        {new Date(row.createdAt).toLocaleString("zh-CN")}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

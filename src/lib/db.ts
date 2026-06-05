@@ -96,6 +96,7 @@ export interface WaybillQuery {
   pageSize: number;
   externalCode?: string;
   receiverName?: string;
+  senderName?: string;
   batchId?: string;
   startDate?: string;
   endDate?: string;
@@ -112,7 +113,7 @@ export interface PaginatedResult<T> {
 export async function queryWaybills(
   query: WaybillQuery
 ): Promise<PaginatedResult<import("@prisma/client").Waybill>> {
-  const { page, pageSize, externalCode, receiverName, batchId, startDate, endDate } = query;
+  const { page, pageSize, externalCode, receiverName, senderName, batchId, startDate, endDate } = query;
   const where: Record<string, unknown> = {};
 
   if (externalCode) {
@@ -120,6 +121,9 @@ export async function queryWaybills(
   }
   if (receiverName) {
     where.receiverName = { contains: receiverName };
+  }
+  if (senderName) {
+    where.senderName = { contains: senderName };
   }
   if (batchId) {
     where.batchId = batchId;
@@ -221,6 +225,12 @@ export interface SaveOrdersInput {
   receiverPhone?: string;
   receiverAddress?: string;
   remark?: string;
+  senderName?: string;
+  senderPhone?: string;
+  senderAddress?: string;
+  weight?: number;
+  pieces?: number;
+  temperatureLevel?: string;
   items: { skuCode: string; skuName: string; quantity: number; spec?: string }[];
 }
 
@@ -256,6 +266,12 @@ export async function saveOrders(
           receiverPhone: input.receiverPhone || null,
           receiverAddress: input.receiverAddress || null,
           remark: input.remark || null,
+          senderName: input.senderName || null,
+          senderPhone: input.senderPhone || null,
+          senderAddress: input.senderAddress || null,
+          weight: input.weight || null,
+          pieces: input.pieces || null,
+          temperatureLevel: input.temperatureLevel || null,
           items: {
             create: input.items.map((item) => ({
               skuCode: item.skuCode,
@@ -290,6 +306,127 @@ export async function saveOrders(
   }
 
   return { batchId, successCount, failCount, failedRows };
+}
+
+export interface ConvertToWaybillInput {
+  batchId: string;
+  senderName: string;
+  senderPhone: string;
+  senderAddress: string;
+  orderIds?: string[];
+  overrides?: Record<string, { weight?: number; pieces?: number; temperatureLevel?: string }>;
+}
+
+export interface ConvertResult {
+  successCount: number;
+  failCount: number;
+  failedRows: { orderId: string; externalCode: string | null; error: string }[];
+}
+
+export async function createWaybillsFromBatch(input: ConvertToWaybillInput): Promise<ConvertResult> {
+  const { batchId, senderName, senderPhone, senderAddress, orderIds, overrides } = input;
+
+  const batch = await prisma.importBatch.findUnique({ where: { id: batchId } });
+  if (!batch) {
+    throw new Error("批次不存在");
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    const where: Record<string, unknown> = { batchId, convertedAt: null };
+    if (orderIds && orderIds.length > 0) {
+      where.id = { in: orderIds };
+    }
+
+    const candidates = await tx.importOrder.findMany({
+      where,
+      include: { items: true },
+    });
+
+    if (candidates.length === 0) {
+      return { successCount: 0, failCount: 0, failedRows: [], skipped: true };
+    }
+
+    const candidateIds = candidates.map((o) => o.id);
+    const { count: lockedCount } = await tx.importOrder.updateMany({
+      where: { id: { in: candidateIds }, convertedAt: null },
+      data: { convertedAt: new Date() },
+    });
+
+    if (lockedCount === 0) {
+      return { successCount: 0, failCount: 0, failedRows: [], skipped: true };
+    }
+
+    const orders = await tx.importOrder.findMany({
+      where: { id: { in: candidateIds }, convertedAt: { not: null } },
+      include: { items: true },
+    });
+
+    let successCount = 0;
+    let failCount = 0;
+    const failedRows: ConvertResult["failedRows"] = [];
+
+    for (const order of orders) {
+      if (!order.receiverName || !order.receiverPhone || !order.receiverAddress) {
+        failCount++;
+        failedRows.push({
+          orderId: order.id,
+          externalCode: order.externalCode,
+          error: "收件人信息不完整（姓名、电话、地址为必填）",
+        });
+        continue;
+      }
+
+      const override = overrides?.[order.id];
+      const w = override?.weight ?? order.weight ?? 0;
+      const p = override?.pieces ?? order.pieces ?? 0;
+      const t = override?.temperatureLevel ?? order.temperatureLevel ?? "常温";
+
+      try {
+        await tx.waybill.create({
+          data: {
+            batchId,
+            externalCode: order.externalCode || null,
+            senderName,
+            senderPhone,
+            senderAddress,
+            receiverName: order.receiverName,
+            receiverPhone: order.receiverPhone,
+            receiverAddress: order.receiverAddress,
+            weight: Number(w),
+            pieces: Number(p),
+            temperatureLevel: t,
+            remark: order.remark || null,
+          },
+        });
+        successCount++;
+      } catch (e) {
+        failCount++;
+        failedRows.push({
+          orderId: order.id,
+          externalCode: order.externalCode,
+          error: e instanceof Error ? e.message : "创建运单失败",
+        });
+      }
+    }
+
+    const remaining = await tx.importOrder.count({
+      where: { batchId, convertedAt: null },
+    });
+    if (remaining === 0) {
+      await tx.importBatch.update({
+        where: { id: batchId },
+        data: { status: "converted" },
+      });
+    }
+
+    return { successCount, failCount, failedRows, skipped: false };
+  });
+
+  if (result.skipped) {
+    throw new Error("没有可转为运单的订单");
+  }
+
+  return { successCount: result.successCount, failCount: result.failCount, failedRows: result.failedRows };
 }
 
 export interface OrderQuery {

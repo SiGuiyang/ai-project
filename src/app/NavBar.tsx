@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { href: "/import", label: "导入" },
   { href: "/import/rules", label: "解析规则" },
-  { href: "/import/history", label: "运单列表" },
+  { href: "/import/history", label: "历史记录" },
+  { href: "/waybills", label: "运单管理" },
 ];
 
 export default function NavBar() {

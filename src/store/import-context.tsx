@@ -107,6 +107,8 @@ export function ImportProvider({ children }: { children: ReactNode }) {
       const headerFields = new Set([
         "externalCode", "storeName",
         "receiverName", "receiverPhone", "receiverAddress",
+        "senderName", "senderPhone", "senderAddress",
+        "weight", "pieces", "temperatureLevel",
         "remark",
       ]);
       const itemFields = new Set(["skuCode", "skuName", "quantity", "spec"]);
@@ -139,6 +141,12 @@ export function ImportProvider({ children }: { children: ReactNode }) {
           receiverPhone: mapped.receiverPhone || undefined,
           receiverAddress: mapped.receiverAddress || undefined,
           remark: mapped.remark || undefined,
+          senderName: mapped.senderName || undefined,
+          senderPhone: mapped.senderPhone || undefined,
+          senderAddress: mapped.senderAddress || undefined,
+          weight: mapped.weight ? Number(mapped.weight) : undefined,
+          pieces: mapped.pieces ? Number(mapped.pieces) : undefined,
+          temperatureLevel: mapped.temperatureLevel || undefined,
           items,
         };
       });
@@ -176,6 +184,12 @@ export function ImportProvider({ children }: { children: ReactNode }) {
         receiverAddress: "",
         externalCode: "",
         remark: "",
+        senderName: "",
+        senderPhone: "",
+        senderAddress: "",
+        weight: undefined,
+        pieces: undefined,
+        temperatureLevel: undefined,
         items: [],
       };
       const newOrders = [...prev.orders, newOrder];

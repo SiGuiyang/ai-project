@@ -39,6 +39,9 @@ export default function ImportResult() {
           <button className="el-button el-button--primary" onClick={() => { reset(); setStep("upload"); }}>
             继续导入
           </button>
+          <button className="el-button el-button--success" onClick={() => { window.location.href = `/waybills/create?batchId=${batchResult.id}`; }}>
+            转为运单
+          </button>
           <button className="el-button el-button--plain" onClick={() => { window.location.href = "/import/history"; }}>
             查看历史记录
           </button>
