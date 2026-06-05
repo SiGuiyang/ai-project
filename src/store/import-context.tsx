@@ -20,6 +20,9 @@ import { validateAllOrders } from "@/lib/validator";
 interface ImportState {
   step: "upload" | "rule" | "preview" | "submitting" | "result";
   parsedData: ParsedData | null;
+  rawFileBuffer: ArrayBuffer | null;
+  rawFileName: string;
+  rawFileType: "excel" | "word" | "pdf" | "";
   columnMapping: ColumnMapping | null;
   orders: ImportOrderRow[];
   validationResults: ValidationResult[];
@@ -33,6 +36,7 @@ interface ImportState {
 
 interface ImportContextValue extends ImportState {
   setParsedData: (data: ParsedData) => void;
+  setRawFile: (buffer: ArrayBuffer, name: string, type: ImportState["rawFileType"]) => void;
   setColumnMapping: (mapping: ColumnMapping) => void;
   setOrders: (orders: ImportOrderRow[]) => void;
   setSelectedRule: (rule: ParseRuleConfig | null) => void;
@@ -53,6 +57,9 @@ interface ImportContextValue extends ImportState {
 const initialState: ImportState = {
   step: "upload",
   parsedData: null,
+  rawFileBuffer: null,
+  rawFileName: "",
+  rawFileType: "",
   columnMapping: null,
   orders: [],
   validationResults: [],
@@ -71,6 +78,10 @@ export function ImportProvider({ children }: { children: ReactNode }) {
 
   const setParsedData = useCallback((data: ParsedData) => {
     setState((prev) => ({ ...prev, parsedData: data }));
+  }, []);
+
+  const setRawFile = useCallback((buffer: ArrayBuffer, name: string, type: ImportState["rawFileType"]) => {
+    setState((prev) => ({ ...prev, rawFileBuffer: buffer, rawFileName: name, rawFileType: type }));
   }, []);
 
   const setColumnMapping = useCallback((mapping: ColumnMapping) => {
@@ -200,7 +211,7 @@ export function ImportProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const reset = useCallback(() => {
-    setState(initialState);
+    setState({ ...initialState });
   }, []);
 
   return (
@@ -208,6 +219,7 @@ export function ImportProvider({ children }: { children: ReactNode }) {
       value={{
         ...state,
         setParsedData,
+        setRawFile,
         setColumnMapping,
         setOrders,
         setSelectedRule,

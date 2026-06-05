@@ -3,9 +3,65 @@
 import { useCallback, useRef, useState, type DragEvent } from "react";
 import { parseExcelFile } from "@/lib/excel-parser";
 import { useImport } from "@/store/import-context";
+import type { ParsedData } from "@/types";
+
+const ACCEPTED_EXTS = ["xlsx", "xls", "docx", "pdf"] as const;
+type FileExt = (typeof ACCEPTED_EXTS)[number];
+
+function getFileType(ext: string): "excel" | "word" | "pdf" | null {
+  if (["xlsx", "xls"].includes(ext)) return "excel";
+  if (ext === "docx") return "word";
+  if (ext === "pdf") return "pdf";
+  return null;
+}
+
+async function parseExcel(buffer: ArrayBuffer): Promise<ParsedData> {
+  const result = parseExcelFile(buffer);
+  if (!result.success) throw new Error(result.error);
+  return result.data;
+}
+
+async function parseWord(buffer: ArrayBuffer): Promise<ParsedData> {
+  const mammoth = await import("mammoth");
+  const { value: html } = await mammoth.convertToHtml({ arrayBuffer: buffer });
+  const text = html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/tr>/gi, "\n")
+    .replace(/<\/td>/gi, "\t")
+    .replace(/<\/h[1-6]>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  const lines = text.split("\n").filter(Boolean);
+  return { headers: ["content"], rows: lines.map((l) => ({ content: l })) };
+}
+
+async function parsePdf(buffer: ArrayBuffer): Promise<ParsedData> {
+  const pdfjsLib = await import("pdfjs-dist");
+  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+  const textParts: string[] = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items
+      .map((item) => ("str" in item ? item.str ?? "" : ""))
+      .join(" ");
+    textParts.push(pageText);
+  }
+  const text = textParts.join("\n");
+  const lines = text.split("\n").filter(Boolean);
+  return { headers: ["content"], rows: lines.map((l) => ({ content: l })) };
+}
 
 export default function FileUploader() {
-  const { setParsedData, setStep } = useImport();
+  const { setParsedData, setRawFile, setStep } = useImport();
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -25,9 +81,17 @@ export default function FileUploader() {
       setParsing(true);
       setParseProgress(0);
 
-      const ext = file.name.split(".").pop()?.toLowerCase();
-      if (!ext || !["xlsx", "xls"].includes(ext)) {
-        setError("文件格式错误，请上传 .xlsx 或 .xls 文件");
+      const ext = file.name.split(".").pop()?.toLowerCase() || "";
+      if (!ACCEPTED_EXTS.includes(ext as FileExt)) {
+        setError("文件格式错误，请上传 .xlsx / .xls / .docx / .pdf 文件");
+        setParsing(false);
+        uploadingRef.current = false;
+        return;
+      }
+
+      const fileType = getFileType(ext);
+      if (!fileType) {
+        setError("不支持的文件格式");
         setParsing(false);
         uploadingRef.current = false;
         return;
@@ -44,29 +108,28 @@ export default function FileUploader() {
         setParseLabel("正在读取文件...");
         setParseProgress(10);
 
-        await new Promise((r) => setTimeout(r, 50));
-
-        setParseLabel("正在解析 Excel 数据...");
-        setParseProgress(35);
-
         const buffer = await file.arrayBuffer();
 
-        setParseProgress(55);
-        setParseLabel("正在处理数据格式...");
+        setParseProgress(30);
+        setParseLabel(`正在解析 ${ext.toUpperCase()} 数据...`);
 
-        await new Promise((r) => setTimeout(r, 30));
-
-        const result = parseExcelFile(buffer);
-
-        if (!result.success) {
-          setError(result.error);
-          setParsing(false);
-          uploadingRef.current = false;
-          return;
+        let parsed: ParsedData;
+        switch (fileType) {
+          case "excel":
+            parsed = await parseExcel(buffer);
+            break;
+          case "word":
+            parsed = await parseWord(buffer);
+            break;
+          case "pdf":
+            parsed = await parsePdf(buffer);
+            break;
+          default:
+            throw new Error("Unsupported type");
         }
 
         setParseProgress(80);
-        setParseLabel(`已解析 ${result.data.rows.length} 条数据...`);
+        setParseLabel(`已解析 ${parsed.rows.length} 条数据...`);
 
         await new Promise((r) => setTimeout(r, 100));
 
@@ -75,15 +138,21 @@ export default function FileUploader() {
 
         await new Promise((r) => setTimeout(r, 200));
 
-        setParsedData(result.data);
+        setParsedData(parsed);
+        setRawFile(buffer, file.name, fileType);
         setStep("rule");
-      } catch {
-        setError("文件读取失败，请重试");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "文件读取失败，请重试";
+        if (msg.includes("image") || msg.includes("image.png") || msg.includes("image input")) {
+          setError("文件包含图片内容或为扫描件，当前 AI 模型不支持图片输入。请使用含可提取文本的文件，或手动创建规则。");
+        } else {
+          setError(msg);
+        }
         setParsing(false);
         uploadingRef.current = false;
       }
     },
-    [setParsedData, setStep]
+    [setParsedData, setRawFile, setStep]
   );
 
   const onDrop = useCallback(
@@ -179,7 +248,7 @@ export default function FileUploader() {
               {" "}或拖拽文件到此处
             </p>
             <p style={{ fontSize: 12, color: "var(--el-text-color-placeholder)" }}>
-              仅支持 .xlsx / .xls 格式
+              支持 .xlsx / .xls / .docx / .pdf 格式
             </p>
             {fileName && (
               <p style={{ fontSize: 12, color: "var(--el-color-primary)", marginTop: 12 }}>
@@ -192,7 +261,7 @@ export default function FileUploader() {
         <input
           ref={inputRef}
           type="file"
-          accept=".xlsx,.xls"
+          accept=".xlsx,.xls,.docx,.pdf"
           style={{ display: "none" }}
           onChange={onInputChange}
           disabled={parsing}

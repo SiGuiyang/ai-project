@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useImport } from "@/store/import-context";
-import type { ParseRuleConfig } from "@/types";
+import type { ParseRuleConfig, ImportOrderRow } from "@/types";
+import type { ExecutorResult } from "@/lib/rule-engine/types";
 
 interface SavedRule {
   id: string;
@@ -13,7 +14,12 @@ interface SavedRule {
 }
 
 export default function RuleSelector() {
-  const { parsedData: pd, selectedRule, setSelectedRule, aiGeneratedRule, setAiGeneratedRule, applyMapping, setStep } = useImport();
+  const {
+    parsedData: pd, rawFileBuffer, rawFileName, rawFileType,
+    selectedRule, setSelectedRule,
+    aiGeneratedRule, setAiGeneratedRule,
+    setOrders, applyMapping, setStep,
+  } = useImport();
 
   const [savedRules, setSavedRules] = useState<SavedRule[]>([]);
   const [loadingRules, setLoadingRules] = useState(true);
@@ -88,36 +94,82 @@ export default function RuleSelector() {
         return;
       }
       const rule = data.config as ParseRuleConfig;
-      rule.fileType = "excel";
+      rule.fileType = rawFileType || "excel";
       setAiGeneratedRule(rule);
     } catch {
       setAiError("AI 分析失败，请重试");
     } finally {
       setAiLoading(false);
     }
-  }, [pd, setAiGeneratedRule]);
+  }, [pd, rawFileType, setAiGeneratedRule]);
 
-  const handleNext = () => {
-    if (mode === "select") {
-      if (!selectedRule) return;
-    } else if (mode === "manual") {
-      if (!selectedRule) return;
-    } else if (mode === "ai") {
-      if (!aiGeneratedRule) return;
-      setSelectedRule(aiGeneratedRule);
-    }
+  const handleNext = useCallback(async () => {
+    let config: ParseRuleConfig | null = null;
+    if (mode === "select") config = selectedRule;
+    else if (mode === "manual") config = selectedRule;
+    else if (mode === "ai") config = aiGeneratedRule;
 
-    const config = mode === "ai" ? aiGeneratedRule : selectedRule;
-    if (!config || !config.columnMappings) {
-      return;
-    }
+    if (!config) return;
 
-    if (pd) {
+    // If raw file is available and it's Word/PDF or has postProcessors, use rule-engine
+    const needsEngine = rawFileBuffer &&
+      (rawFileType !== "excel" ||
+       (config.postProcessors && config.postProcessors.length > 0) ||
+       (config.extractors && config.extractors.length > 0));
+
+    if (needsEngine && rawFileBuffer) {
+      try {
+        let result: ExecutorResult;
+        const resolvedFileType = rawFileType || config.fileType || "excel";
+
+        switch (resolvedFileType) {
+          case "word": {
+            const { executeWord } = await import("@/lib/rule-engine/word-executor");
+            result = await executeWord(rawFileBuffer, config);
+            break;
+          }
+          case "pdf": {
+            const { executePdf } = await import("@/lib/rule-engine/pdf-executor");
+            result = await executePdf(rawFileBuffer, config);
+            break;
+          }
+          default: {
+            const { executeExcel } = await import("@/lib/rule-engine/excel-executor");
+            result = executeExcel(rawFileBuffer, config);
+            break;
+          }
+        }
+
+        const orders: ImportOrderRow[] = result.orders.map((o, i) => ({
+          id: `order-${i}-${Date.now()}`,
+          externalCode: o.externalCode || undefined,
+          storeName: o.storeName || undefined,
+          receiverName: o.receiverName || undefined,
+          receiverPhone: o.receiverPhone || undefined,
+          receiverAddress: o.receiverAddress || undefined,
+          remark: o.remark || undefined,
+          items: o.items.map((item) => ({
+            skuCode: item.skuCode,
+            skuName: item.skuName,
+            quantity: item.quantity,
+            spec: item.spec || undefined,
+          })),
+        }));
+
+        setOrders(orders);
+        setStep("preview");
+      } catch {
+        // Fallback to old flow on error
+        if (pd && config.columnMappings && Object.keys(config.columnMappings).length > 0) {
+          applyMapping(config.columnMappings);
+        }
+      }
+    } else if (pd && config.columnMappings && Object.keys(config.columnMappings).length > 0) {
       applyMapping(config.columnMappings);
     } else {
       setStep("preview");
     }
-  };
+  }, [mode, selectedRule, aiGeneratedRule, rawFileBuffer, rawFileType, pd, setOrders, setStep, applyMapping]);
 
   return (
     <div className="el-card">
@@ -180,14 +232,19 @@ export default function RuleSelector() {
             {pd ? (
               <div style={{ background: "var(--el-color-info-light-9)", borderRadius: 6, padding: 12, fontSize: 13 }}>
                 <p>已解析数据：<strong>{pd.headers.length}</strong> 列，<strong>{pd.rows.length}</strong> 行</p>
+                {rawFileName && (
+                  <p style={{ color: "var(--el-text-color-secondary)", marginTop: 4, fontSize: 12 }}>
+                    文件：{rawFileName}（{rawFileType?.toUpperCase() || "未知"}）
+                  </p>
+                )}
                 <p style={{ color: "var(--el-text-color-secondary)", marginTop: 4, fontSize: 12 }}>
                   列头：{pd.headers.join("、")}
                 </p>
                 {pd.rows.length > 0 && (
                   <pre style={{ fontSize: 11, marginTop: 8, whiteSpace: "pre-wrap", background: "var(--el-color-white)", padding: 8, borderRadius: 4, maxHeight: 120, overflow: "auto" }}>
-                    {pd.headers.map((h) => h).join("\t")}
+                    {pd.headers.join("\t")}
                     {"\n"}
-                    {pd.rows.slice(0, 5).map((r, i) => pd.headers.map((h) => r[h] ?? "").join("\t")).join("\n")}
+                    {pd.rows.slice(0, 5).map((r) => pd.headers.map((h) => r[h] ?? "").join("\t")).join("\n")}
                   </pre>
                 )}
               </div>
