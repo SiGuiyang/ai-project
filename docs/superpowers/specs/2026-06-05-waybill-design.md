@@ -85,6 +85,7 @@ model ImportBatch {
 ### 同步更新清单
 
 - `prisma/schema.prisma` — ImportOrder 加字段
+- 执行 `npx prisma migrate dev --name add-waybill-fields` 生成迁移文件并更新数据库
 - `src/types/index.ts` — `ImportOrderRow` 接口增加新字段
 - `src/lib/db.ts` — `saveOrders` 写入新字段；`SaveOrdersInput` 增加新字段
 - `src/store/import-context.tsx` — `applyMapping` 支持新字段映射
@@ -144,7 +145,7 @@ model ImportBatch {
 
 ### 修正 GET /api/waybills（运单历史查询）
 
-当前 `/api/waybills/route.ts` 误用了 `queryOrders()`（查询 ImportOrder），需修正为 `queryWaybills()`（查询 Waybill）。
+当前 `/api/waybills/route.ts` 误用了 `queryOrders()`（查询 ImportOrder），需修正为 `queryWaybills()`（查询 Waybill）。`queryWaybills` 函数已存在于 `src/lib/db.ts:112`，直接使用即可。
 
 **查询参数：** page, pageSize, externalCode, receiverName, senderName, startDate, endDate
 
@@ -217,6 +218,18 @@ model ImportBatch {
 
 3. **ImportHistory** (`src/app/import/history/page.tsx`)
    - 调用的 API 从 `/api/waybills` 改为 `/api/orders`
+
+### 页面状态（新页面）
+
+| 页面 | Loading | Empty | Error |
+|------|---------|-------|-------|
+| /waybills/create | 骨架屏/加载动画 | 批次不存在或全部已转换时显示提示 + 返回按钮 | 网络错误时显示错误信息 + 重试按钮 |
+| /waybills | 与现有 /import/history 一致的 loading 动画 | 与现有一致的「暂无记录」空状态 | Toast 提示错误，表格区域保持上次数据 |
+
+### 注意事项
+
+- **ImportBatch 状态枚举**：现有代码中若存在 `status` 白名单校验（如只允许 `pending | processing | completed | failed`），需更新为包含 `converted`，否则新状态会被拒绝
+- **并发安全**：`convertedAt` + `$transaction` 确保重复调用不会重复创建 Waybill
 
 ## 组件结构
 
