@@ -31,7 +31,7 @@ model Waybill {
 
 ### ImportOrder 模型扩充
 
-在现有 ImportOrder 模型上增加发件人信息及物流字段：
+在现有 ImportOrder 模型上增加发件人信息、物流字段及转换状态：
 
 ```prisma
 model ImportOrder {
@@ -47,25 +47,42 @@ model ImportOrder {
   items           OrderItem[]
 
   // 新增字段
-  senderName      String?     // 发件人姓名
-  senderPhone     String?     // 发件人电话
-  senderAddress   String?     // 发件人地址
-  weight          Float?      // 重量(kg)
-  pieces          Int?        // 件数
-  temperatureLevel String?   // 温层
+  senderName      String?     // 发件人姓名（从文件映射）
+  senderPhone     String?     // 发件人电话（从文件映射）
+  senderAddress   String?     // 发件人地址（从文件映射）
+  weight          Float?      // 重量(kg)（从文件映射）
+  pieces          Int?        // 件数（从文件映射）
+  temperatureLevel String?   // 温层（从文件映射）
+  convertedAt     DateTime?   // 转为运单的时间，null=未转换
 
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 }
 ```
 
-### ImportBatch 状态扩充
+`convertedAt` 用于追踪每个 ImportOrder 的转换状态，支持分批转换。
 
-在现有 status 枚举值 `pending | processing | completed | failed` 基础上，增加 `converted` 状态，表示该批次已转为运单。
+### ImportBatch 模型（已有）
+
+```prisma
+model ImportBatch {
+  id           String        @id @default(cuid())
+  status       String        @default("pending")  // pending | processing | completed | failed | converted
+  totalCount   Int           @default(0)
+  successCount Int           @default(0)
+  failCount    Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  waybills     Waybill[]
+  orders       ImportOrder[]
+}
+```
+
+`converted` 状态表示该批次所有订单已转为运单。
 
 ### 同步更新清单
 
-- `prisma/schema.prisma` — ImportOrder 加字段、ImportBatch 状态说明
+- `prisma/schema.prisma` — ImportOrder 加字段
 - `src/types/index.ts` — `ImportOrderRow` 接口增加新字段
 - `src/lib/db.ts` — `saveOrders` 写入新字段；`SaveOrdersInput` 增加新字段
 - `src/store/import-context.tsx` — `applyMapping` 支持新字段映射
@@ -85,27 +102,32 @@ model ImportOrder {
   "senderName": "string (必填)",
   "senderPhone": "string (必填)",
   "senderAddress": "string (必填)",
-  "orderIds": ["string"]  // 可选，为空则转换该批次全部订单
+  "orderIds": ["string"]  // 可选，为空则转换该批次全部未转换的订单
 }
 ```
 
-**处理逻辑：**
-1. 校验 batchId 存在且 ImportBatch 状态不为 converted（防重复提交）
-2. 查询指定 batchId 下的 ImportOrder（若 orderIds 不为空则过滤）
-3. 若 orderIds 中有不存在的 ID，返回 400 及具体错误
-4. 对每条 ImportOrder，创建一条 Waybill：
-   - senderName/senderPhone/senderAddress 使用请求传入的值
-   - receiverName/receiverPhone/receiverAddress/externalCode/remark 从 ImportOrder 复制
-   - weight/pieces/temperatureLevel 从 ImportOrder 复制
-5. 更新 ImportBatch 状态为 `converted`，累加 successCount/failCount
-6. 返回创建的运单数
+**处理逻辑（使用 Prisma $transaction 保证原子性）：**
+1. 校验 batchId 存在，否则返回 400
+2. 查询指定 batchId 下 `convertedAt IS NULL` 的 ImportOrder
+   - 若 orderIds 不为空，额外过滤只保留 orderIds 中的且未转换的
+   - 若无有效订单，返回 400 "没有可转为运单的订单"
+3. 校验每行：receiverName/receiverPhone/receiverAddress 不可为空（Waybill 模型要求非空）
+   - 有空值的行计入 failedRows，不阻塞其他行
+4. 事务内执行：
+   - 创建 Waybill 记录（每条 ImportOrder 一条）：
+     - senderName/senderPhone/senderAddress 使用请求传入的值
+     - receiverName/receiverPhone/receiverAddress/externalCode/remark 从 ImportOrder 复制
+     - weight/pieces/temperatureLevel 从 ImportOrder 复制
+   - 更新对应 ImportOrder 的 convertedAt = now()
+   - 若批次内所有 ImportOrder 均已转换（convertedAt 全部非空），更新 ImportBatch.status = "converted"
+5. 返回创建结果
 
 **成功响应 (200)：**
 ```json
 {
-  "successCount": 100,
+  "successCount": 50,
   "failCount": 0,
-  "failedRows": []
+  "failedRows": [{ "rowIndex": 5, "error": "收件人电话为空" }]
 }
 ```
 
@@ -113,10 +135,8 @@ model ImportOrder {
 | 状态码 | 场景 | 响应体 |
 |--------|------|--------|
 | 400 | batchId 不存在 | `{ "error": "批次不存在" }` |
-| 400 | 该批次已转为运单 | `{ "error": "该批次已转为运单，请勿重复提交" }` |
-| 400 | orderIds 中有无效 ID | `{ "error": "以下订单不存在: [id1, id2]" }` |
 | 400 | 无有效订单可转 | `{ "error": "没有可转为运单的订单" }` |
-| 500 | 数据库异常 | `{ "error": "转换失败，请重试" }` |
+| 500 | 事务执行失败 | `{ "error": "转换失败，请重试" }` |
 
 ### 修正 GET /api/waybills（运单历史查询）
 
@@ -137,7 +157,7 @@ model ImportOrder {
 
 ### 新增 GET /api/orders（订单历史查询）
 
-将原 `/api/waybills` 的 ImportOrder 查询逻辑迁移到 `/api/orders/route.ts`，供 `/import/history` 页面继续使用。
+将原 `/api/waybills` 的 ImportOrder 查询逻辑迁移到 `/api/orders/route.ts`，供 `/import/history` 页面使用。
 
 参数与响应格式与当前 `/api/waybills` 一致。
 
@@ -148,25 +168,25 @@ model ImportOrder {
 布局分三部分：
 
 1. **发件人信息填写区**（顶部卡片）
-   - 发件人姓名（必填）、电话（必填，格式校验）、地址（必填）
+   - 发件人姓名（必填）、电话（必填）、地址（必填）
    - 一次性填写，作用于所有选中运单
-   - 前端实时校验，未填时「提交运单」按钮禁用
+   - 前端实时校验，三项均填才启用「提交运单」按钮
 
-2. **数据表格**（中间，与 ImportPreview 风格一致）
+2. **数据表格**（中间，基于 ExcelTable 改造的 WaybillCreateTable）
    - 使用 react-window 虚拟列表渲染
    - 展示该批次所有 ImportOrder
    - 列：外部编码、收货门店、收件人、收件人电话、收件人地址、重量、件数、温层、SKU
    - 重量/件数/温层可编辑（Inline CellEditor）
    - 行前 checkbox 支持多选
    - 顶部全选 checkbox
-   - 选中行数实时显示
+   - 已转换的订单（convertedAt 不为空）灰化不可选
 
 3. **操作栏**（底部固定）
    - 显示「已选中 X / 共 Y 条」
    - 「提交运单」按钮，点击后：
      - 按钮变为 loading 状态，禁用重复点击
-     - 显示进度条（分批提交）
-     - 提交完成后显示成功/失败数
+     - 调用 POST /api/waybills/create-from-batch
+     - 成功后显示结果（成功/失败数）
      - 提供「查看运单记录」按钮跳转到 /waybills
 
 ### 新增 /waybills — 运单历史列表
@@ -182,21 +202,15 @@ model ImportOrder {
 **表格列：**
 外部编码、发件人、发件人电话、收件人、收件人电话、重量、件数、温层、创建时间
 
-**分页：** 与现有分页组件一致
-
 ### 现有页面调整
 
 1. **NavBar** (`src/app/NavBar.tsx`)
    - 新增「运单管理」菜单项，指向 `/waybills`
 
 2. **ImportResult** (`src/components/ImportResult.tsx`)
-   - 新增「转为运单」按钮，指向 `/waybills/create?batchId=xxx`
-   - 放在「继续导入」和「查看历史记录」之间
+   - 新增「转为运单」按钮，指向 `/waybills/create?batchId=xxx`，放在「继续导入」和「查看历史记录」之间
 
-3. **ImportPreview** (`src/components/ExcelTable.tsx`)
-   - 数据表头增加「重量」「件数」「温层」列显示（当数据中有这些字段时）
-
-4. **ImportHistory** (`src/app/import/history/page.tsx`)
+3. **ImportHistory** (`src/app/import/history/page.tsx`)
    - 调用的 API 从 `/api/waybills` 改为 `/api/orders`
 
 ## 组件结构
@@ -209,17 +223,17 @@ src/
 │   │   │   └── route.ts          # ImportOrder 历史查询（从 /api/waybills 迁移）
 │   │   └── waybills/
 │   │       ├── create-from-batch/
-│   │       │   └── route.ts      # 转运单 API
+│   │       │   └── route.ts      # 转运单 API（事务保护）
 │   │       └── route.ts          # Waybill 历史查询（修正为 queryWaybills）
 │   ├── waybills/
 │   │   ├── create/
 │   │   │   └── page.tsx          # 转为运单工作页
-│   │   └── page.tsx              # 运单历史列表页（复用 /import/history 风格）
+│   │   └── page.tsx              # 运单历史列表页
 │   └── import/
 │       └── history/
 │           └── page.tsx          # 改 API 地址为 /api/orders
 └── components/
-    └── WaybillCreateTable.tsx    # 转为运单的数据表格组件（基于 ExcelTable）
+    └── WaybillCreateTable.tsx    # 转为运单的数据表格组件
 ```
 
 ## 数据流
@@ -228,19 +242,20 @@ src/
 文件上传 → 解析 → 规则映射 → 预览编辑 → 提交(ImportOrder)
                                                     ↓
                                               ImportResult
-                                           ┌─ 查看历史记录 → /import/history (/api/orders)
-                                           └─ 转为运单 → /waybills/create?batchId=xxx
+                                           ├─ 继续导入 → /import
+                                           ├─ 转为运单 → /waybills/create?batchId=xxx
+                                           └─ 查看历史记录 → /import/history
                                                            ↓
-                                                   填写发件人信息
-                                                   勾选订单 → 编辑 weight/pieces/temperatureLevel
-                                                   点击「提交运单」（按钮 loading，防重复）
+                                             /waybills/create
+                                             填写发件人信息（统一作用于所有选中订单）
+                                             勾选未转换的订单
+                                             编辑 weight/pieces/temperatureLevel
+                                             点击「提交运单」
                                                            ↓
-                                           POST /api/waybills/create-from-batch
-                                           (校验批次状态，防重复提交)
+                                             POST /api/waybills/create-from-batch
+                                             ($transaction: 创建 Waybill + 标记 convertedAt)
                                                            ↓
-                                                   创建 Waybill 记录
-                                                   ImportBatch → status=converted
+                                             创建 Waybill 成功
                                                            ↓
-                                           ┌─ 查看运单记录 → /waybills (/api/waybills)
-                                           └─ 继续导入 → /import
+                                             跳转到 /waybills 查看运单记录
 ```
